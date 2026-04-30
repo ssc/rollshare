@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Roll Share — Share the joy of every roll</title>
+  <meta name="description" content="Roll Share is a desk-side companion for online D&D nights. Point your phone at your dice tray and your party sees your face, your dice, and the magic — all in one video feed inside Zoom, Teams or Discord." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --radius: 0.75rem;
+      /* Navy palette — matches splash #12122A */
+      --background: #12122a;
+      --foreground: #dcdce6;
+      --panel: #1a1a36;
+      --card: #1e1e3d;
+      --border: #2d2d50;
+      --primary-foreground: #12122a;
+      --muted-foreground: #7878a0;
+      /* Blue accent (shifted from purple) */
+      --arcane: #5b7fff;
+      --arcane-glow: #7a9aff;
+      --live: oklch(0.66 0.24 25);
+      --gradient-arcane: linear-gradient(135deg, #3a5ce8, #6a8fff);
+      --gradient-ember: linear-gradient(135deg, oklch(0.7 0.18 55), oklch(0.82 0.16 80));
+      --shadow-arcane:
+        0 0 0 1px color-mix(in oklab, var(--arcane) 30%, transparent),
+        0 10px 40px -10px color-mix(in oklab, var(--arcane) 50%, transparent);
+      --shadow-ember:
+        0 0 0 1px color-mix(in oklab, oklch(0.78 0.16 65) 25%, transparent),
+        0 10px 30px -10px color-mix(in oklab, oklch(0.78 0.16 65) 45%, transparent);
+      --font-display: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+    }
+
+    body {
+      font-family: "Inter", system-ui, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      background-image:
+        radial-gradient(circle at 20% 10%, color-mix(in oklab, var(--arcane) 12%, transparent), transparent 45%),
+        radial-gradient(circle at 80% 90%, color-mix(in oklab, oklch(0.78 0.16 65) 10%, transparent), transparent 50%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--font-display);
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      text-decoration: none;
+      color: var(--foreground);
+    }
+    .logo-icon {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      margin-right: -1px;
+    }
+    .logo-icon svg { height: 3.25rem; width: 3.25rem; }
+    .logo-name {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+    }
+    .logo-subtitle {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted-foreground);
+    }
+
+    nav { display: flex; align-items: center; gap: 1.5rem; }
+    nav a {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    nav a:hover { color: var(--foreground); }
+
+    /* ── Main ── */
+    main { flex: 1; }
+
+    /* ── Hero ── */
+    .hero {
+      max-width: 72rem;
+      margin: 0 auto;
+      padding: 3rem 2rem 5rem;
+      display: grid;
+      gap: 3rem;
+      align-items: center;
+    }
+    @media (min-width: 1024px) {
+      .hero { grid-template-columns: 1fr 1fr; }
+    }
+
+    .hero-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+      animation: float-up 0.4s ease-out both;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      background: color-mix(in oklab, var(--panel) 60%, transparent);
+      backdrop-filter: blur(4px);
+      padding: 0.25rem 0.75rem;
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      width: fit-content;
+    }
+    .badge-dot {
+      height: 0.375rem;
+      width: 0.375rem;
+      border-radius: 9999px;
+      background: var(--arcane);
+      flex-shrink: 0;
+      animation: spark 2s ease-in-out infinite;
+    }
+
+    h1.headline {
+      font-size: clamp(2.25rem, 5vw, 3.75rem);
+      font-weight: 600;
+      line-height: 1.05;
+    }
+    .text-grad-arcane {
+      display: inline-block;
+      color: transparent;
+      background-image: var(--gradient-arcane);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-body {
+      font-size: 1.125rem;
+      color: var(--muted-foreground);
+      max-width: 32rem;
+      line-height: 1.65;
+    }
+
+    .cta-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding-top: 0.5rem;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-radius: 0.5rem;
+      background: var(--gradient-ember);
+      color: var(--primary-foreground);
+      padding: 0.75rem 1.25rem;
+      font-weight: 500;
+      font-size: 0.9375rem;
+      text-decoration: none;
+      box-shadow: var(--shadow-ember);
+      transition: filter 0.15s;
+      font-family: "Inter", sans-serif;
+    }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--foreground);
+      padding: 0.75rem 1.25rem;
+      font-weight: 500;
+      font-size: 0.9375rem;
+      text-decoration: none;
+      transition: background 0.15s;
+      font-family: "Inter", sans-serif;
+    }
+    .btn-secondary:hover { background: var(--card); }
+
+    .hero-footnote { font-size: 0.75rem; color: var(--muted-foreground); }
+
+    /* ── Hero visual ── */
+    .hero-visual { position: relative; }
+    .hero-visual-glow {
+      position: absolute;
+      inset: -1.5rem;
+      background: var(--gradient-arcane);
+      opacity: 0.3;
+      filter: blur(48px);
+      border-radius: 9999px;
+      pointer-events: none;
+    }
+    .hero-panel {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-arcane);
+      overflow: hidden;
+    }
+    .hero-panel > img { width: 100%; height: auto; display: block; }
+
+    .scanline {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.06) 2px,
+        rgba(0,0,0,0.06) 4px
+      );
+      opacity: 0.4;
+    }
+
+    .live-badge {
+      position: absolute;
+      top: 0.75rem;
+      left: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-radius: 0.375rem;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      padding: 0.25rem 0.625rem;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+    }
+    .live-dot {
+      position: relative;
+      height: 0.5rem;
+      width: 0.5rem;
+      border-radius: 9999px;
+      background: var(--live);
+      flex-shrink: 0;
+    }
+    .live-dot::after {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      border-radius: 9999px;
+      background: var(--live);
+      opacity: 0.4;
+      animation: live-pulse 1.6s ease-out infinite;
+    }
+
+    .dice-overlay {
+      position: absolute;
+      bottom: 0.75rem;
+      right: 0.75rem;
+      width: 8rem;
+      background: var(--panel);
+      border: 1px solid color-mix(in oklab, var(--arcane) 40%, transparent);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-arcane);
+      overflow: hidden;
+    }
+    .dice-overlay img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+    }
+    .dice-label {
+      padding: 0.2rem 0.5rem 0.3rem;
+      font-size: 0.625rem;
+      font-family: var(--font-mono);
+      text-align: center;
+      background: var(--panel);
+    }
+
+    /* ── Features ── */
+    .features {
+      max-width: 72rem;
+      margin: 0 auto;
+      padding: 0 2rem 6rem;
+      display: grid;
+      gap: 1.25rem;
+    }
+    @media (min-width: 768px) {
+      .features { grid-template-columns: repeat(3, 1fr); }
+    }
+    .feature-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      transition: border-color 0.15s;
+    }
+    .feature-card:hover { border-color: color-mix(in oklab, var(--arcane) 40%, transparent); }
+    .feature-icon { font-size: 1.875rem; margin-bottom: 0.75rem; }
+    .feature-title {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      margin-bottom: 0.5rem;
+      color: var(--foreground);
+    }
+    .feature-body { font-size: 0.875rem; color: var(--muted-foreground); line-height: 1.6; }
+
+    /* ── How it works ── */
+    .how {
+      max-width: 60rem;
+      margin: 0 auto;
+      padding: 0 2rem 6rem;
+    }
+    .how h2 {
+      font-size: 1.875rem;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .steps { display: grid; gap: 1.25rem; list-style: none; }
+    @media (min-width: 768px) {
+      .steps { grid-template-columns: repeat(3, 1fr); }
+    }
+    .step {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+    }
+    .step-num {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: var(--arcane-glow);
+      margin-bottom: 0.5rem;
+    }
+    .step-title { font-size: 0.875rem; color: var(--foreground); margin-bottom: 0.25rem; }
+    .step-body { font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.5; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 1.5rem 2rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+    }
+
+    /* ── Animations ── */
+    @keyframes live-pulse {
+      0%   { transform: scale(0.6); opacity: 0.6; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    @keyframes float-up {
+      0%   { transform: translateY(8px); opacity: 0; }
+      100% { transform: translateY(0);   opacity: 1; }
+    }
+    @keyframes spark {
+      0%, 100% { opacity: 1;   transform: scale(1);   }
+      50%       { opacity: 0.6; transform: scale(0.8); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="#" class="logo">
+      <div class="logo-icon">
+        <!-- Isometric die — matches RollShare splash & logo -->
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Left face (face 3: three diagonal pips) -->
+          <polygon points="5.1,10 12,14 12,22 5.1,18" fill="#8c8c9b" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <!-- Right face (face 5: X pattern pips) -->
+          <polygon points="12,14 18.9,10 18.9,18 12,22" fill="#b9b9c8" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <!-- Top face (face 1: single center pip) -->
+          <polygon points="12,6 18.9,10 12,14 5.1,10" fill="#e4e4f0" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+
+          <!-- Top face pips: 1 dot at center (12, 10) -->
+          <ellipse cx="12" cy="10" rx="0.75" ry="0.52" fill="#191937"/>
+
+          <!-- Left face pips: 3 diagonal dots -->
+          <!-- P(u,v) = (5.1,10) + u*(6.9,4) + v*(0,8) -->
+          <!-- top-left u=0.25 v=0.25 --> <ellipse cx="6.83" cy="13" rx="0.62" ry="0.44" transform="rotate(30 6.83 13)" fill="#191937"/>
+          <!-- center   u=0.50 v=0.50 --> <ellipse cx="8.55" cy="16" rx="0.62" ry="0.44" transform="rotate(30 8.55 16)" fill="#191937"/>
+          <!-- bot-right u=0.75 v=0.75 --> <ellipse cx="10.28" cy="19" rx="0.62" ry="0.44" transform="rotate(30 10.28 19)" fill="#191937"/>
+
+          <!-- Right face pips: 5 X-pattern dots -->
+          <!-- P(u,v) = (12,14) + u*(6.9,-4) + v*(0,8) -->
+          <!-- top-left     u=0.2 v=0.2 --> <ellipse cx="13.38" cy="14.8" rx="0.62" ry="0.44" transform="rotate(-30 13.38 14.8)" fill="#191937"/>
+          <!-- top-right    u=0.8 v=0.2 --> <ellipse cx="17.52" cy="12.4" rx="0.62" ry="0.44" transform="rotate(-30 17.52 12.4)" fill="#191937"/>
+          <!-- center       u=0.5 v=0.5 --> <ellipse cx="15.45" cy="16"   rx="0.62" ry="0.44" transform="rotate(-30 15.45 16)"   fill="#191937"/>
+          <!-- bot-left     u=0.2 v=0.8 --> <ellipse cx="13.38" cy="19.6" rx="0.62" ry="0.44" transform="rotate(-30 13.38 19.6)" fill="#191937"/>
+          <!-- bot-right    u=0.8 v=0.8 --> <ellipse cx="17.52" cy="17.2" rx="0.62" ry="0.44" transform="rotate(-30 17.52 17.2)" fill="#191937"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-name">ROLL SHARE</div>
+        <div class="logo-subtitle">For Players</div>
+      </div>
+    </a>
+    <nav>
+      <a href="#features">What it does</a>
+      <a href="#how">How it works</a>
+      <a href="#">Open Companion</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-content">
+        <div class="badge">
+          <span class="badge-dot"></span>
+          A companion for tabletop players
+        </div>
+        <h1 class="headline">
+          Share the joy of<br>
+          <span class="text-grad-arcane">every roll</span> with your party.
+        </h1>
+        <p class="hero-body">
+          Roll Share is a desk-side companion for online D&amp;D nights. Point your phone
+          at your dice tray and your party sees your face, your dice, and the magic&hellip;
+          all in one video feed inside Zoom, Teams or Discord.
+        </p>
+        <div class="cta-group">
+          <a href="#" class="btn-primary">Open Player Companion <span aria-hidden="true">→</span></a>
+          <a href="#" class="btn-secondary">Set up Dice Cam</a>
+        </div>
+        <p class="hero-footnote">Just for your table — not a stream, not a broadcast. Your group, your moments.</p>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-visual-glow"></div>
+        <div class="hero-panel">
+          <img src="assets/dm-scene.jpg" alt="A player at their desk with dice and a character sheet" width="1280" height="768" />
+          <div class="scanline"></div>
+          <div class="live-badge">
+            <span class="live-dot"></span>
+            <span>YOU &middot; IN PARTY CALL</span>
+          </div>
+          <div class="dice-overlay">
+            <img src="assets/dice-pip.jpg" alt="Stylized green dice in a wooden tray" />
+            <div class="scanline" style="opacity:0.3"></div>
+            <div class="dice-label">YOUR DICE</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🎲</div>
+        <h3 class="feature-title">Your dice, on screen</h3>
+        <p class="feature-body">Your phone becomes a dice cam that auto-pops into frame the moment you roll. No more &lsquo;I swear it was a 20.&rsquo;</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💎</div>
+        <h3 class="feature-title">Show off your lucky set</h3>
+        <p class="feature-body">We get so attached to our dice. Roll Share gives you more opportunities to actually use the dice you&rsquo;ve spent years collecting — your party gets to see the obsidian d20 you&rsquo;ve nat-20&rsquo;d with three sessions running and witness just how cursed (or blessed) they really are.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎭</div>
+        <h3 class="feature-title">Share the &lsquo;no way that just happened&rsquo; moments</h3>
+        <p class="feature-body">When the bard seduces the dragon on a nat 20 after the wizard fumbles a Feather Fall — those stories live forever. Roll Share makes sure everyone sees them happen, together.</p>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how" class="how">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li class="step">
+          <div class="step-num">01</div>
+          <div class="step-title">Open the companion</div>
+          <div class="step-body">Run Roll Share on the same computer you join your game on.</div>
+        </li>
+        <li class="step">
+          <div class="step-num">02</div>
+          <div class="step-title">Pair your phone</div>
+          <div class="step-body">Scan a QR code. Prop your phone over your dice tray.</div>
+        </li>
+        <li class="step">
+          <div class="step-num">03</div>
+          <div class="step-title">Pick Roll Share as your camera</div>
+          <div class="step-body">In Zoom or Discord, choose &lsquo;Roll Share Camera&rsquo; — and play.</div>
+        </li>
+      </ol>
+    </section>
+
+  </main>
+
+  <footer>
+    <span>© Roll Share · Roll well, friend.</span>
+    <span style="font-family: var(--font-mono)">v0.1 · prototype</span>
+  </footer>
+
+</body>
+</html>
