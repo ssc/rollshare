@@ -100,6 +100,24 @@
     }
     nav a:hover { color: var(--foreground); }
 
+    /* On narrow screens, stack the nav below the logo so the header
+       has room to breathe instead of cramming everything on one line. */
+    @media (max-width: 640px) {
+      header {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.75rem 1.5rem;
+        padding: 1rem 1.25rem;
+      }
+      .logo { width: 100%; justify-content: center; }
+      nav {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.25rem;
+      }
+    }
+
     /* ── Main ── */
     main { flex: 1; }
 
@@ -418,7 +436,7 @@
       </div>
       <div>
         <div class="logo-name">ROLL SHARE</div>
-        <div class="logo-subtitle">A better way to roll dice together</div>
+        <div class="logo-subtitle">A better way to play together</div>
       </div>
     </a>
     <nav>
@@ -442,15 +460,15 @@
           <span class="text-grad-arcane">every roll</span> with your party.
         </h1>
         <p class="hero-body">
-          Roll Share is a desk-side companion for online D&amp;D nights. Point your phone
-          at your dice tray and your party sees your face, your dice, and the magic&hellip;
+          RollShare is a desk-side companion for online D&amp;D nights. Point your phone
+          at your dice tray and your party sees your dice, your face, and the magic&hellip;
           all in one video feed inside Zoom, Teams or Discord.
         </p>
         <div class="cta-group">
           <a href="#" class="btn-primary">Open Player Companion <span aria-hidden="true">→</span></a>
           <a href="#" class="btn-secondary">Set up Dice Cam</a>
         </div>
-        <p class="hero-footnote">Just for your table — not a stream, not a broadcast. Your group, your moments.</p>
+        <p class="hero-footnote">Bring back the excitement and anticipation of rolling dice.</p>
       </div>
 
       <div class="hero-visual">
@@ -515,7 +533,7 @@
   </main>
 
   <footer>
-    <span>© Roll Share · Roll well, friend.</span>
+    <span>© RollShare · Roll well, friend.</span>
     <span style="font-family: var(--font-mono)">v0.1 · prototype</span>
   </footer>
 
