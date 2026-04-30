@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RollShare — Connect Your Phone</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Segoe UI, system-ui, sans-serif;
+            background: #12122a;
+            color: #e8e8e8;
+            min-height: 100dvh;
+            padding: 1.5rem 1rem 3rem;
+            max-width: 540px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 2rem;
+        }
+        header img {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.02em;
+            margin-bottom: 0;
+        }
+        header p {
+            color: #999;
+            font-size: 0.92rem;
+        }
+
+        /* ── Error banner (shown when URL params are missing/invalid) ── */
+        #error-banner {
+            display: none;
+            background: #3a0a0a;
+            border: 1px solid #c0392b;
+            border-radius: 10px;
+            padding: 1rem 1.2rem;
+            margin-bottom: 1.5rem;
+            color: #f5b7b1;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        #error-banner strong { color: #f1948a; display: block; margin-bottom: 0.3rem; }
+
+        /* ── Step cards ── */
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #2e2e2e;
+            border-radius: 12px;
+            padding: 1.2rem 1.4rem;
+            margin-bottom: 1rem;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.7rem;
+        }
+        .step-badge {
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            color: #aaa;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 6px;
+            padding: 0.2rem 0.55rem;
+            white-space: nowrap;
+        }
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        .card p, .card li {
+            font-size: 0.88rem;
+            color: #bbb;
+            line-height: 1.55;
+        }
+        .card ul {
+            list-style: none;
+            padding: 0;
+        }
+        .card li { padding: 0.1rem 0; }
+        .card li::before {
+            content: "›";
+            margin-right: 0.45rem;
+            color: #555;
+        }
+        .card strong { color: #ddd; }
+
+        /* ── Connect card (green accent) ── */
+        #connect-card {
+            border-color: #1f3d2d;
+            background: #111c17;
+        }
+        #connect-card .card-title { color: #86efac; }
+        #connect-card .step-badge { background: #1a3526; border-color: #2a5038; color: #86efac; }
+
+        #connect-btn {
+            display: block;
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.85rem 1rem;
+            background: #16a34a;
+            color: #f0faf4;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            transition: background 0.15s;
+        }
+        #connect-btn:hover { background: #15803d; }
+        #connect-btn:active { background: #14532d; }
+        #connect-url-hint {
+            margin-top: 0.6rem;
+            font-size: 0.78rem;
+            color: #3f6b50;
+            text-align: center;
+            word-break: break-all;
+        }
+
+        /* ── Warning section inside Step 2 ── */
+        .warning-section {
+            margin-top: 1rem;
+            border: 1px solid #4a3a00;
+            background: #1a1500;
+            border-radius: 10px;
+            padding: 1rem 1.1rem 0.9rem;
+        }
+        .warning-section .warn-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #facc15;
+            margin-bottom: 0.5rem;
+        }
+        .warning-section p {
+            font-size: 0.85rem;
+            color: #c9a84c;
+            line-height: 1.5;
+        }
+        .warning-section strong { color: #facc15; }
+
+        .warn-screenshot {
+            display: block;
+            margin: 0.75rem auto 0.3rem;
+            text-align: center;
+        }
+        .warn-screenshot img {
+            max-width: 110px;
+            width: 35%;
+            border-radius: 8px;
+            border: 1px solid #5a4800;
+            display: inline-block;
+        }
+        .warn-screenshot span {
+            display: block;
+            font-size: 0.72rem;
+            color: #7a6020;
+            margin-top: 0.25rem;
+        }
+
+        .platform-tabs {
+            display: flex;
+            gap: 0.4rem;
+            margin: 0.8rem 0 0.6rem;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 0.4rem 0;
+            border-radius: 7px;
+            border: 1px solid #3a3000;
+            background: #2a2200;
+            color: #bbb;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: background 0.1s, border-color 0.1s;
+        }
+        .tab-btn.active {
+            background: #4a3a00;
+            border-color: #8a6a00;
+            color: #facc15;
+            font-weight: 600;
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .tab-panel ol {
+            padding-left: 1.2rem;
+            margin-top: 0.4rem;
+        }
+        .tab-panel li {
+            font-size: 0.86rem;
+            color: #c9a84c;
+            line-height: 1.55;
+            margin-bottom: 0.2rem;
+        }
+        .tab-panel li strong { color: #facc15; }
+
+        /* ── FAQ / "It's not working" section ── */
+        details {
+            margin-top: 1.5rem;
+            border: 1px solid #2e2e2e;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        summary {
+            padding: 0.9rem 1.2rem;
+            cursor: pointer;
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: #ccc;
+            background: #1a1a1a;
+            list-style: none;
+            user-select: none;
+        }
+        summary::-webkit-details-marker { display: none; }
+        summary::before {
+            content: "▸ ";
+            color: #666;
+        }
+        details[open] summary::before { content: "▾ "; }
+
+        .faq-body {
+            padding: 1rem 1.2rem 1.2rem;
+            background: #141414;
+        }
+        .faq-item { margin-bottom: 1.1rem; }
+        .faq-item:last-child { margin-bottom: 0; }
+        .faq-q {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #ccc;
+            margin-bottom: 0.25rem;
+        }
+        .faq-a {
+            font-size: 0.85rem;
+            color: #999;
+            line-height: 1.55;
+        }
+        .faq-a strong { color: #bbb; }
+
+        footer {
+            text-align: center;
+            margin-top: 2.5rem;
+            font-size: 0.78rem;
+            color: #444;
+        }
+
+        /* ── Lightbox ── */
+        #lightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #lightbox.open { display: flex; flex-direction: column; align-items: center; padding: 1.5rem 1rem 0; }
+        #lightbox img {
+            width: 100%;
+            max-width: 480px;
+            border-radius: 10px;
+            display: block;
+        }
+        #lightbox-close {
+            margin: 1.5rem auto 2rem;
+            padding: 0.75rem 2.5rem;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 10px;
+            color: #ccc;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        #lightbox-close:active { background: #3a3a3a; }
+    </style>
+</head>
+<body>
+
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot preview">
+    <img id="lightbox-img" src="" alt="" />
+    <button id="lightbox-close">Close</button>
+</div>
+
+<header>
+    <img src="assets/rollshare_logo.png" alt="RollShare" />
+    <h1>RollShare</h1>
+</header>
+
+<div id="error-banner" role="alert">
+    <strong>Something looks wrong with this link</strong>
+    <span id="error-msg">The QR code may be outdated. Please rescan the QR code shown on the RollShare Companion App window.</span>
+</div>
+
+<!-- Step 1: Choose camera -->
+<div class="card" id="step1-card">
+    <div class="card-header">
+        <span class="step-badge">Step 1</span>
+        <span class="card-title">On your computer — pick your camera</span>
+    </div>
+    <ul>
+        <li>Open <strong>Zoom</strong> or <strong>Teams</strong></li>
+        <li>Go to <strong>Settings → Video</strong></li>
+        <li>Choose <strong>RollShare DiceCam</strong> as your camera</li>
+    </ul>
+    <p style="margin-top:0.7rem; font-size:0.85rem; color:#6b9b7a;">
+        ✓ You should see the <strong style="color:#8ecba4;">RollShare</strong> logo appear in your Zoom/Teams video preview once this is set up correctly.
+    </p>
+</div>
+
+<!-- Step 2: Connect phone + security warning combined -->
+<div class="card" id="connect-card">
+    <div class="card-header">
+        <span class="step-badge">Step 2</span>
+        <span class="card-title">On this phone — open the camera page</span>
+    </div>
+    <p style="margin-bottom:0.8rem;">
+        We're about to set up your phone camera to stream your dice tray to your computer.
+    </p>
+
+    <!-- Security warning embedded in Step 2 -->
+    <div class="warning-section">
+        <div class="warn-title">⚠ Heads up — your phone will show a security warning</div>
+        <p>This is <strong>normal and expected</strong>. RollShare uses a private local network connection. Your phone's browser will warn you it's not secure — you need to tap through it to continue.</p>
+
+        <div class="platform-tabs">
+            <button class="tab-btn" data-tab="android">Android / Chrome</button>
+            <button class="tab-btn" data-tab="ios">iPhone / Safari</button>
+        </div>
+        <div class="tab-panel" id="tab-android">
+            <a href="assets/android_warning_with_arrow.png" class="warn-screenshot">
+                <img src="assets/android_warning_with_arrow.png" alt="Screenshot showing where to tap Advanced to proceed past the security warning" />
+                <span>tap to enlarge</span>
+            </a>
+            <ol>
+                <li>Tap <strong>Advanced</strong></li>
+                <li>Tap <strong>Proceed to … (unsafe)</strong></li>
+            </ol>
+        </div>
+        <div class="tab-panel" id="tab-ios">
+            <a href="assets/ios_warning_with_arrows.png" class="warn-screenshot">
+                <img src="assets/ios_warning_with_arrows.png" alt="iPhone Safari showing where to tap Show Details then visit this website" style="max-width:180px;width:60%;" />
+                <span>tap to enlarge</span>
+            </a>
+            <ol>
+                <li>Tap <strong>Show Details</strong></li>
+                <li>Tap <strong>visit this website</strong></li>
+                <li>Tap <strong>Visit Website</strong> in the confirmation prompt</li>
+            </ol>
+        </div>
+    </div>
+
+    <a id="connect-btn" href="#">Open camera page →</a>
+    <div id="connect-url-hint"></div>
+    <p style="margin-top:0.75rem; font-size:0.82rem; color:#666; text-align:center;">
+        If it doesn't connect, hit the <strong style="color:#888;">browser back button</strong> to return here and read the <strong style="color:#888;">It's not working</strong> section below.
+    </p>
+</div>
+
+<!-- FAQ -->
+<details>
+    <summary>It's not working — help</summary>
+    <div class="faq-body">
+        <div class="faq-item">
+            <div class="faq-q">The camera page never loads</div>
+            <div class="faq-a">
+                Your phone and computer must be on the <strong>same network</strong>, and the RollShare Companion App must be open and running.
+                <ul style="margin-top:0.5rem; padding-left:1.2rem; display:flex; flex-direction:column; gap:0.35rem;">
+                    <li><strong>First:</strong> On your phone, go to Settings and turn Wi-Fi <strong>off</strong>, then back <strong>on</strong>. Then try the link again.</li>
+                    <li><strong>At home (home router):</strong> Make sure Wi-Fi is enabled in your phone's settings and that it's connected to the same Wi-Fi network as your computer.</li>
+                    <li><strong>On public Wi-Fi</strong> (hotel, school, coffee shop): Public networks often block devices from talking to each other. Turn on your <strong>phone's hotspot</strong>, connect your laptop to it, then rescan the QR code.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-q">I don't see "RollShare DiceCam" in Zoom or Teams</div>
+            <div class="faq-a"><strong>Reboot your computer</strong> and try again. After a fresh install the virtual camera driver needs a full restart to register with Windows — simply restarting Zoom or Teams is usually not enough.</div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-q">My phone keeps saying the connection isn't private</div>
+            <div class="faq-a">Follow the steps in Step 2 above to tap through the warning. Your data never leaves your local network.</div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-q">I need to rescan the QR code</div>
+            <div class="faq-a">The QR code is shown on the <strong>RollShare Companion App</strong> window on your computer. Scan it fresh with your phone camera to get a new link.</div>
+        </div>
+    </div>
+</details>
+
+<footer>RollShare &mdash; local network only &mdash; your video never leaves your computer</footer>
+
+<script>
+    (function () {
+        "use strict";
+
+        // ── Parse and validate URL params ──────────────────────────────────────
+        var params = new URLSearchParams(window.location.search);
+        var ip   = params.get("ip")   || "";
+        var port = params.get("port") || "";
+
+        var errorBanner = document.getElementById("error-banner");
+        var errorMsg    = document.getElementById("error-msg");
+        var connectBtn  = document.getElementById("connect-btn");
+        var urlHint     = document.getElementById("connect-url-hint");
+
+        function isValidIPv4(s) {
+            var parts = s.split(".");
+            if (parts.length !== 4) return false;
+            return parts.every(function (p) {
+                if (!/^\d{1,3}$/.test(p)) return false;
+                var n = parseInt(p, 10);
+                return n >= 0 && n <= 255;
+            });
+        }
+
+        function isValidPort(s) {
+            if (!/^\d+$/.test(s)) return false;
+            var n = parseInt(s, 10);
+            return n >= 1 && n <= 65535;
+        }
+
+        // This page is served from a public host (ssc.github.io). The QR code
+        // generated by the local RollShare app encodes ?ip=<lan-ip>&port=<port>.
+        // Without those params there is nothing meaningful to link to.
+
+        var valid = ip && port && isValidIPv4(ip) && isValidPort(port);
+
+        if (!valid) {
+            errorBanner.style.display = "block";
+            if (!ip || !port) {
+                errorMsg.textContent = "The QR code may be outdated or incomplete. Please rescan the QR code shown on the RollShare Companion App window.";
+            } else {
+                errorMsg.textContent = "The link contains an unrecognised address (" + ip + ":" + port + "). Please rescan the QR code shown on the RollShare Companion App window.";
+            }
+            connectBtn.style.background = "#333";
+            connectBtn.style.color = "#666";
+            connectBtn.style.cursor = "not-allowed";
+            connectBtn.removeAttribute("href");
+            connectBtn.addEventListener("click", function (e) { e.preventDefault(); });
+            urlHint.textContent = "";
+        } else {
+            var lanUrl = "https://" + ip + ":" + port + "/?onboarding=1";
+            connectBtn.href = lanUrl;
+            urlHint.textContent = lanUrl;
+        }
+
+        // ── Lightbox ────────────────────────────────────────────────────────────
+        var lightbox      = document.getElementById("lightbox");
+        var lightboxImg   = document.getElementById("lightbox-img");
+        var lightboxClose = document.getElementById("lightbox-close");
+
+        document.querySelectorAll(".warn-screenshot").forEach(function (a) {
+            a.addEventListener("click", function (e) {
+                e.preventDefault();
+                lightboxImg.src = a.getAttribute("href");
+                lightboxImg.alt = a.querySelector("img") ? a.querySelector("img").alt : "";
+                lightbox.classList.add("open");
+                lightbox.scrollTop = 0;
+                document.body.style.overflow = "hidden";
+            });
+        });
+
+        function closeLightbox() {
+            lightbox.classList.remove("open");
+            document.body.style.overflow = "";
+        }
+
+        lightboxClose.addEventListener("click", closeLightbox);
+        lightbox.addEventListener("click", function (e) {
+            if (e.target === lightbox) closeLightbox();
+        });
+
+        // ── Platform tabs ───────────────────────────────────────────────────────
+        var tabBtns   = document.querySelectorAll(".tab-btn");
+        var tabPanels = document.querySelectorAll(".tab-panel");
+
+        function switchTab(tabName) {
+            tabBtns.forEach(function (b) { b.classList.remove("active"); });
+            tabPanels.forEach(function (p) { p.classList.remove("active"); });
+            var btn = document.querySelector(".tab-btn[data-tab='" + tabName + "']");
+            var panel = document.getElementById("tab-" + tabName);
+            if (btn) btn.classList.add("active");
+            if (panel) panel.classList.add("active");
+        }
+
+        tabBtns.forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                switchTab(btn.getAttribute("data-tab"));
+            });
+        });
+
+        // Auto-detect platform; default to iOS for desktop/unknown
+        var ua = navigator.userAgent;
+        var isAndroid = /android/i.test(ua);
+        switchTab(isAndroid ? "android" : "ios");
+    })();
+</script>
+</body>
+</html>
