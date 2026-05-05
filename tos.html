@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Terms &amp; Privacy — RollShare</title>
+  <meta name="description" content="How RollShare uses your email address: to key your app data and to contact you about RollShare. We never share or sell it." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --background: #12122a;
+      --foreground: #dcdce6;
+      --panel: #1a1a36;
+      --card: #1e1e3d;
+      --border: #2d2d50;
+      --muted-foreground: #7878a0;
+      --arcane: #5b7fff;
+      --gradient-arcane: linear-gradient(135deg, #3a5ce8, #6a8fff);
+      --font-display: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+    }
+
+    body {
+      font-family: "Inter", system-ui, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      background-image:
+        radial-gradient(circle at 20% 10%, color-mix(in oklab, var(--arcane) 12%, transparent), transparent 45%),
+        radial-gradient(circle at 80% 90%, color-mix(in oklab, oklch(0.78 0.16 65) 10%, transparent), transparent 50%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--font-display);
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Header (mirrors site/index.html) ── */
+    header {
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      text-decoration: none;
+      color: var(--foreground);
+    }
+    .logo-icon {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      margin-right: -1px;
+    }
+    .logo-icon svg { height: 3.25rem; width: 3.25rem; }
+    .logo-name {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+    }
+    .logo-subtitle {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted-foreground);
+    }
+    nav { display: flex; align-items: center; gap: 1.5rem; }
+    nav a {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    nav a:hover { color: var(--foreground); }
+    @media (max-width: 640px) {
+      header {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.75rem 1.5rem;
+        padding: 1rem 1.25rem;
+      }
+      .logo { width: 100%; justify-content: center; }
+      nav { width: 100%; justify-content: center; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+    }
+
+    /* ── Main ── */
+    main { flex: 1; }
+    .doc {
+      max-width: 44rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+    .eyebrow {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted-foreground);
+      margin-bottom: 0.5rem;
+    }
+    h1.title {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 600;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+    }
+    .text-grad-arcane {
+      display: inline-block;
+      color: transparent;
+      background-image: var(--gradient-arcane);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .updated {
+      font-size: 0.8125rem;
+      color: var(--muted-foreground);
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: color-mix(in oklab, var(--panel) 70%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .card h2 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+    .card p, .card li {
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: var(--foreground);
+    }
+    .card p + p { margin-top: 0.75rem; }
+    .card ul { margin: 0.5rem 0 0 1.25rem; }
+    .card li { margin-bottom: 0.35rem; }
+    .card .muted { color: var(--muted-foreground); }
+    .card a { color: var(--arcane); text-decoration: none; }
+    .card a:hover { text-decoration: underline; }
+
+    .summary {
+      border-color: color-mix(in oklab, var(--arcane) 40%, var(--border));
+      background: color-mix(in oklab, var(--arcane) 8%, var(--panel));
+    }
+
+    footer {
+      padding: 1.5rem 2rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+    }
+    footer a { color: var(--muted-foreground); text-decoration: none; }
+    footer a:hover { color: var(--foreground); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="index.html" class="logo">
+      <div class="logo-icon">
+        <!-- Isometric die — matches RollShare splash & logo -->
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="5.1,10 12,14 12,22 5.1,18" fill="#8c8c9b" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <polygon points="12,14 18.9,10 18.9,18 12,22" fill="#b9b9c8" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <polygon points="12,6 18.9,10 12,14 5.1,10" fill="#e4e4f0" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <ellipse cx="12" cy="10" rx="0.75" ry="0.52" fill="#191937"/>
+          <ellipse cx="6.83" cy="13" rx="0.62" ry="0.44" transform="rotate(30 6.83 13)" fill="#191937"/>
+          <ellipse cx="8.55" cy="16" rx="0.62" ry="0.44" transform="rotate(30 8.55 16)" fill="#191937"/>
+          <ellipse cx="10.28" cy="19" rx="0.62" ry="0.44" transform="rotate(30 10.28 19)" fill="#191937"/>
+          <ellipse cx="13.38" cy="14.8" rx="0.62" ry="0.44" transform="rotate(-30 13.38 14.8)" fill="#191937"/>
+          <ellipse cx="17.52" cy="12.4" rx="0.62" ry="0.44" transform="rotate(-30 17.52 12.4)" fill="#191937"/>
+          <ellipse cx="15.45" cy="16" rx="0.62" ry="0.44" transform="rotate(-30 15.45 16)" fill="#191937"/>
+          <ellipse cx="13.38" cy="19.6" rx="0.62" ry="0.44" transform="rotate(-30 13.38 19.6)" fill="#191937"/>
+          <ellipse cx="17.52" cy="17.2" rx="0.62" ry="0.44" transform="rotate(-30 17.52 17.2)" fill="#191937"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-name">ROLL SHARE</div>
+        <div class="logo-subtitle">A better way to play together</div>
+      </div>
+    </a>
+    <nav>
+      <a href="index.html">Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc">
+      <div class="eyebrow">Plain-language</div>
+      <h1 class="title">Terms &amp; <span class="text-grad-arcane">Privacy</span></h1>
+      <div class="updated">Last updated: May 2026</div>
+
+      <div class="card summary">
+        <h2>The short version</h2>
+        <p>
+          When you sign in to RollShare, we use your email address only to
+          identify you across your devices and to send you transactional or
+          product messages from RollShare. <strong>We never sell your email,
+          and we never share it with third parties for marketing.</strong>
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Why we ask for your email</h2>
+        <ul>
+          <li><strong>To key your app data and settings.</strong> Your email
+            (linked to a stable user ID) is how RollShare knows which preferences,
+            saved layouts, and configuration belong to you on this computer and
+            on any future device.</li>
+          <li><strong>To send you the sign-in code.</strong> RollShare uses
+            email codes (one-time passwords) instead of passwords. We email
+            you a 6-digit code each time you need to verify a new device.</li>
+          <li><strong>To contact you about RollShare.</strong> Occasional
+            messages directly from us about meaningful updates, important
+            fixes, or things you specifically asked about. Low volume — not
+            a marketing newsletter.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>What we do <em>not</em> do</h2>
+        <ul>
+          <li>We do not sell your email address.</li>
+          <li>We do not share your email with third-party advertisers,
+            data brokers, or marketing partners.</li>
+          <li>We do not read or store the contents of your video feed.
+            Your camera and microphone stay on your local network — RollShare
+            never uploads your video to our servers.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>How your email is stored</h2>
+        <p>
+          Authentication is handled by <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a>,
+          a service that securely stores your email and a stable user ID for
+          us. The sign-in code is delivered through a transactional email
+          provider whose only job is to deliver mail; they do not use your
+          address for anything else.
+        </p>
+        <p class="muted">
+          Both providers may process your email under their own privacy
+          policies as data sub-processors, strictly for the purpose of
+          delivering RollShare's sign-in flow.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Anonymous usage data</h2>
+        <p>
+          RollShare collects anonymous product analytics — things like
+          "the app launched," "the camera started," "pairing succeeded" —
+          tied to your stable user ID. This helps us spot bugs and figure
+          out which platforms work well. It does not include your video,
+          your audio, the contents of your screen, or anything you type.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Your choices</h2>
+        <ul>
+          <li><strong>Sign out at any time</strong> from the RollShare app.
+            Your local session is cleared.</li>
+          <li><strong>Delete your account.</strong> Email us (see below) and
+            we will remove your email and associated data from our systems.</li>
+          <li><strong>Stop receiving product email from us</strong> by replying
+            to any RollShare message and asking. Sign-in codes will continue
+            to be delivered as long as your account is active, since they are
+            required for you to log in.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Contact</h2>
+        <p>
+          Questions, account deletion requests, or anything else:
+          please reach out via the
+          <a href="https://github.com/schow/my-py-virtual-camera/issues" target="_blank" rel="noopener">project issue tracker</a>
+          or the contact link on our home page.
+        </p>
+        <p class="muted">
+          RollShare is an early-stage independent project. This page is
+          written in plain language and reflects what we actually do.
+          If our practices change, this page will be updated and the
+          "Last updated" date at the top will move forward.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <span>© RollShare · Roll well, friend.</span>
+    <span><a href="index.html">Home</a></span>
+  </footer>
+
+</body>
+</html>
