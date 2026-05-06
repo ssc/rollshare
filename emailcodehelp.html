@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Didn't get your sign-in code? — RollShare</title>
+  <meta name="description" content="Troubleshooting steps if your RollShare sign-in code email didn't arrive." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --background: #12122a;
+      --foreground: #dcdce6;
+      --panel: #1a1a36;
+      --card: #1e1e3d;
+      --border: #2d2d50;
+      --muted-foreground: #7878a0;
+      --arcane: #5b7fff;
+      --gradient-arcane: linear-gradient(135deg, #3a5ce8, #6a8fff);
+      --font-display: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+    }
+
+    body {
+      font-family: "Inter", system-ui, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      background-image:
+        radial-gradient(circle at 20% 10%, color-mix(in oklab, var(--arcane) 12%, transparent), transparent 45%),
+        radial-gradient(circle at 80% 90%, color-mix(in oklab, oklch(0.78 0.16 65) 10%, transparent), transparent 50%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; }
+
+    /* ── Header ── */
+    header {
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 0;
+      text-decoration: none; color: var(--foreground);
+    }
+    .logo-icon { display: flex; align-items: center; flex-shrink: 0; margin-right: -1px; }
+    .logo-icon svg { height: 3.25rem; width: 3.25rem; }
+    .logo-name {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.2;
+    }
+    .logo-subtitle {
+      font-size: 0.625rem; text-transform: uppercase;
+      letter-spacing: 0.18em; color: var(--muted-foreground);
+    }
+    nav { display: flex; align-items: center; gap: 1.5rem; }
+    nav a {
+      font-size: 0.875rem; color: var(--muted-foreground);
+      text-decoration: none; transition: color 0.15s;
+    }
+    nav a:hover { color: var(--foreground); }
+    @media (max-width: 640px) {
+      header { flex-wrap: wrap; justify-content: center; gap: 0.75rem 1.5rem; padding: 1rem 1.25rem; }
+      .logo { width: 100%; justify-content: center; }
+      nav { width: 100%; justify-content: center; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+    }
+
+    /* ── Main ── */
+    main { flex: 1; }
+    .doc { max-width: 44rem; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .eyebrow {
+      font-size: 0.75rem; text-transform: uppercase;
+      letter-spacing: 0.18em; color: var(--muted-foreground); margin-bottom: 0.5rem;
+    }
+    h1.title {
+      font-size: clamp(1.75rem, 4vw, 2.5rem);
+      font-weight: 600; line-height: 1.1; margin-bottom: 0.5rem;
+    }
+    .text-grad-arcane {
+      display: inline-block; color: transparent;
+      background-image: var(--gradient-arcane);
+      background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .updated { font-size: 0.8125rem; color: var(--muted-foreground); margin-bottom: 2rem; }
+
+    .card {
+      background: color-mix(in oklab, var(--panel) 70%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .card h2 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .card p, .card li { font-size: 0.95rem; line-height: 1.65; color: var(--foreground); }
+    .card p + p { margin-top: 0.75rem; }
+    .card ol, .card ul { margin: 0.5rem 0 0 1.25rem; }
+    .card li { margin-bottom: 0.5rem; }
+    .card .muted { color: var(--muted-foreground); }
+    .card a { color: var(--arcane); text-decoration: none; }
+    .card a:hover { text-decoration: underline; }
+    .card code {
+      font-family: "Courier New", ui-monospace, monospace;
+      font-size: 0.88rem;
+      background: color-mix(in oklab, var(--arcane) 10%, var(--card));
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.1em 0.4em;
+      color: var(--foreground);
+    }
+
+    .summary {
+      border-color: color-mix(in oklab, var(--arcane) 40%, var(--border));
+      background: color-mix(in oklab, var(--arcane) 8%, var(--panel));
+    }
+
+    footer {
+      padding: 1.5rem 2rem;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between;
+      font-size: 0.75rem; color: var(--muted-foreground);
+    }
+    footer a { color: var(--muted-foreground); text-decoration: none; }
+    footer a:hover { color: var(--foreground); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="index.html" class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="5.1,10 12,14 12,22 5.1,18" fill="#8c8c9b" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <polygon points="12,14 18.9,10 18.9,18 12,22" fill="#b9b9c8" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <polygon points="12,6 18.9,10 12,14 5.1,10" fill="#e4e4f0" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <ellipse cx="12" cy="10" rx="0.75" ry="0.52" fill="#191937"/>
+          <ellipse cx="6.83" cy="13" rx="0.62" ry="0.44" transform="rotate(30 6.83 13)" fill="#191937"/>
+          <ellipse cx="8.55" cy="16" rx="0.62" ry="0.44" transform="rotate(30 8.55 16)" fill="#191937"/>
+          <ellipse cx="10.28" cy="19" rx="0.62" ry="0.44" transform="rotate(30 10.28 19)" fill="#191937"/>
+          <ellipse cx="13.38" cy="14.8" rx="0.62" ry="0.44" transform="rotate(-30 13.38 14.8)" fill="#191937"/>
+          <ellipse cx="17.52" cy="12.4" rx="0.62" ry="0.44" transform="rotate(-30 17.52 12.4)" fill="#191937"/>
+          <ellipse cx="15.45" cy="16" rx="0.62" ry="0.44" transform="rotate(-30 15.45 16)" fill="#191937"/>
+          <ellipse cx="13.38" cy="19.6" rx="0.62" ry="0.44" transform="rotate(-30 13.38 19.6)" fill="#191937"/>
+          <ellipse cx="17.52" cy="17.2" rx="0.62" ry="0.44" transform="rotate(-30 17.52 17.2)" fill="#191937"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-name">ROLL SHARE</div>
+        <div class="logo-subtitle">A better way to play together</div>
+      </div>
+    </a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="tos.html">Privacy</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="doc">
+      <div class="eyebrow">Sign-in help</div>
+      <h1 class="title">Didn't get your <span class="text-grad-arcane">sign-in code?</span></h1>
+      <div class="updated">Here's what to check.</div>
+
+      <div class="card summary">
+        <h2>What to expect</h2>
+        <p>
+          When you sign in to RollShare, we send a <strong>6-digit code</strong> to the email
+          address you entered. The email comes from:
+        </p>
+        <p style="margin-top:0.75rem;text-align:center;">
+          <code>rollshare.app@gmail.com</code>
+        </p>
+        <p>
+          The code typically arrives within 30&nbsp;seconds. It expires after 1&nbsp;hour.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Step-by-step checklist</h2>
+        <ol>
+          <li>
+            <strong>Check your spam or junk folder.</strong><br>
+            Email clients sometimes flag automated messages. Look for an email from
+            <code>rollshare.app@gmail.com</code> with the subject "Your RollShare sign-in code"
+            (or similar). If you find it there, mark it as "Not spam" so future codes arrive
+            in your inbox.
+          </li>
+          <li>
+            <strong>Check you entered the right email address.</strong><br>
+            Go back to the sign-in screen and make sure there are no typos —
+            an easy thing to miss on a phone keyboard.
+          </li>
+          <li>
+            <strong>Wait a little longer and try "Resend it".</strong><br>
+            Occasionally transactional email is briefly delayed by the receiving mail server.
+            Wait 60&nbsp;seconds, then click <em>resend it</em> in the sign-in dialog.
+          </li>
+          <li>
+            <strong>Check your email provider's filters.</strong><br>
+            Some corporate or school email accounts block external senders by default.
+            If you're using a work address, try again with a personal Gmail, Outlook, or
+            similar account.
+          </li>
+          <li>
+            <strong>Add us to your contacts.</strong><br>
+            Adding <code>rollshare.app@gmail.com</code> to your contacts or address book
+            tells most mail clients to always deliver from this address. This is the
+            most reliable long-term fix.
+          </li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>Still not arriving?</h2>
+        <p>
+          If you've worked through the checklist above and still haven't received the code,
+          please open an issue on the
+          <a href="https://github.com/ssc/my-py-virtual-camera/issues" target="_blank" rel="noopener">project issue tracker</a>
+          and include the email address you used (or a rough description — "Gmail", "Outlook",
+          "corporate domain") so we can investigate on our end.
+        </p>
+        <p class="muted">
+          RollShare is an early-stage independent project. Email delivery is currently handled
+          through a standard Gmail account, which works well for most addresses but has
+          occasional reliability quirks with certain mail servers. We'll move to a dedicated
+          transactional mail provider as the project matures.
+        </p>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <span>© RollShare · Roll well, friend.</span>
+    <span><a href="tos.html">Privacy &amp; Terms</a> · <a href="index.html">Home</a></span>
+  </footer>
+
+</body>
+</html>
