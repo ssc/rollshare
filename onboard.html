@@ -415,7 +415,23 @@
         var params = new URLSearchParams(window.location.search);
         var ip   = params.get("ip")   || "";
         var port = params.get("port") || "";
-
+        // New compact form: ?p=<base64url(ip|port)>
+        var p = params.get("p") || "";
+        if (p && (!ip || !port)) {
+            try {
+                // base64url → base64 + padding
+                var b64 = p.replace(/-/g, "+").replace(/_/g, "/");
+                while (b64.length % 4) b64 += "=";
+                var decoded = atob(b64);
+                var bar = decoded.indexOf("|");
+                if (bar > 0) {
+                    ip   = decoded.slice(0, bar);
+                    port = decoded.slice(bar + 1);
+                }
+            } catch (e) {
+                // Fall through; validation below will flag the error.
+            }
+        }
         var errorBanner = document.getElementById("error-banner");
         var errorMsg    = document.getElementById("error-msg");
         var connectBtn  = document.getElementById("connect-btn");
