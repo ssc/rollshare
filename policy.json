@@ -21,7 +21,7 @@
   },
 
   "upgrade": {
-    "latest_version": "1.0.28",
+    "latest_version": "1.0.27",
     "min_supported_version": "1.0.0",
     "grace_period_end_utc": null,
     "required": false,
