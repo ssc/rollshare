@@ -9,6 +9,9 @@
     posthog.init('phc_znGJ5C6tARtEWQkCkyRJmWsEna3iq7ds4FquU93F6fAE', {
         api_host: 'https://us.i.posthog.com',
         autocapture: false,
+        capture_pageview: false,
+        capture_pageleave: false,
+        disable_session_recording: true,
         persistence: 'memory',
     });
     </script>
@@ -536,8 +539,7 @@
         var isAndroid = /android/i.test(ua);
 
         // ── PostHog event ─────────────────────────────────────────────────────────────────
-        if (uuid) { posthog.identify(uuid); }
-        posthog.capture('onboard_page_viewed', { has_valid_params: valid });
+        posthog.capture('onboard_page_viewed', { has_valid_params: valid, user_id: uuid || null });
 
         switchTab(isAndroid ? "android" : "ios");
     })();
