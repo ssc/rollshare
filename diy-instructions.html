@@ -13,9 +13,38 @@
     ul { margin-left: 1.2rem; }
     li { margin-bottom: 0.7rem; }
     a { color: #7a9aff; }
+    .logo { display: flex; align-items: center; gap: 0; text-decoration: none; color: #dcdce6; justify-content: center; margin-top: 2.5rem; margin-bottom: 0; }
+    .logo-icon { display: flex; align-items: center; flex-shrink: 0; margin-right: -1px; }
+    .logo-icon svg { height: 3.25rem; width: 3.25rem; }
+    .logo-name { font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif; font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.2; }
+    .logo-subtitle { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.18em; color: #7878a0; }
   </style>
 </head>
 <body>
+  <header>
+    <a href="index.html" class="logo">
+      <span class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="5.1,10 12,14 12,22 5.1,18" fill="#8c8c9b" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <polygon points="12,14 18.9,10 18.9,18 12,22" fill="#b9b9c8" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <polygon points="12,6 18.9,10 12,14 5.1,10" fill="#e4e4f0" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+          <ellipse cx="12" cy="10" rx="0.75" ry="0.52" fill="#191937"/>
+          <ellipse cx="6.83" cy="13" rx="0.62" ry="0.44" transform="rotate(30 6.83 13)" fill="#191937"/>
+          <ellipse cx="8.55" cy="16" rx="0.62" ry="0.44" transform="rotate(30 8.55 16)" fill="#191937"/>
+          <ellipse cx="10.28" cy="19" rx="0.62" ry="0.44" transform="rotate(30 10.28 19)" fill="#191937"/>
+          <ellipse cx="13.38" cy="14.8" rx="0.62" ry="0.44" transform="rotate(-30 13.38 14.8)" fill="#191937"/>
+          <ellipse cx="17.52" cy="12.4" rx="0.62" ry="0.44" transform="rotate(-30 17.52 12.4)" fill="#191937"/>
+          <ellipse cx="15.45" cy="16" rx="0.62" ry="0.44" transform="rotate(-30 15.45 16)" fill="#191937"/>
+          <ellipse cx="13.38" cy="19.6" rx="0.62" ry="0.44" transform="rotate(-30 13.38 19.6)" fill="#191937"/>
+          <ellipse cx="17.52" cy="17.2" rx="0.62" ry="0.44" transform="rotate(-30 17.52 17.2)" fill="#191937"/>
+        </svg>
+      </span>
+      <span>
+        <div class="logo-name">ROLL SHARE</div>
+        <div class="logo-subtitle">A better way to play together</div>
+      </span>
+    </a>
+  </header>
   <div class="container">
     <h1 class="title">DIY Dice Tray Instructions</h1>
 
