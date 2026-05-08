@@ -1,4 +1,4 @@
-﻿{
+{
     "schema_version":  1,
     "policy_version":  "2026-05-06.1",
     "generated_at_utc":  "2026-05-07T02:12:38Z",
@@ -21,11 +21,11 @@
                                   }
                     },
     "upgrade":  {
-                    "latest_version":  "1.0.32",
+                    "latest_version":  "1.0.35",
                     "min_supported_version":  "1.0.0",
                     "grace_period_end_utc":  null,
                     "required":  false,
-                    "download_url":  "https://1drv.ms/u/c/2766b7a09bdae02a/IQDvwXgyEtGnSIjPiOUnvJFsAcWZKsT65dwcztaZMJ5FXFc",
+                    "download_url":  "https://ssc.github.io/rollshare/releases/RollShareSetup-1.0.35.exe",
                     "notes_optional":  "A new version of DiceCamera is available. Please upgrade when convenient.",
                     "notes_required":  "This version of DiceCamera is no longer supported. Please update to continue.",
                     "beta_version":  "",

@@ -51,20 +51,20 @@
     <h1>Download RollShare</h1>
     <div class="step-title">Download and install RollShare</div>
     <div class="step-body">Download the Windows installer below. If you see a Windows SmartScreen or Defender warning, click <strong>More info</strong> &rarr; <strong>Run anyway</strong>. Allow the installer to make changes when prompted.</div>
-    <a href="https://1drv.ms/u/c/2766b7a09bdae02a/IQDvwXgyEtGnSIjPiOUnvJFsAcWZKsT65dwcztaZMJ5FXFc" class="download-btn">Download RollShare v1.0.31 for Windows</a>
+    <a id="download-btn" href="https://1drv.ms/u/c/2766b7a09bdae02a/IQDvwXgyEtGnSIjPiOUnvJFsAcWZKsT65dwcztaZMJ5FXFc" class="download-btn">Download RollShare for Windows</a>
 
-    <h1>New App Warnings Tips</h1>
-    Because RollShare is new it hasn't been downloaded much yet, Microsoft Defender SmartScreen hasn't see it and will display some safety dialogs (I wanted to let you know here so you're not surprised).  The dialogs are setup so that users will not accidently download files but it also makes it difficult if you actually want to download the files.  Here are some notes / tips on how to download. 
+    <h1>Windows Safety Warning Tips</h1>
+    Because RollShare is new and hasn't been widely downloaded yet, Microsoft Defender SmartScreen doesn't recognize it and will show some safety dialogs. These are expected — the warnings are designed to prevent accidental downloads, but they can get in the way when you actually want to install something. Here are tips for getting past them.
     <div style="display:flex; flex-direction:column; align-items:center; gap:1.5rem; margin:2.5rem 0 1.5rem 0;">
         <ul>
-            <li>       Tip 1: The first dialog is in the browser download which looks like this in my browser.   I have to click on the 3 dots to access the menu that allows you to select "Keep"
+            <li>Tip 1: The first dialog appears in the browser download bar. Click the 3-dot menu next to the file name and select <strong>Keep</strong>.
       <figure style="margin:0; text-align:center;">
         <img src="assets/downloads_keep.JPG" alt="Browser download warning: Keep file" style="max-width:95%; border-radius:0.6rem; box-shadow:0 2px 12px #0008;" />
         <figcaption style="color:#b0b0e0; font-size:0.97em; margin-top:0.4em;">If you see a browser warning, choose <strong>Keep</strong> to save the installer.</figcaption>
       </figure>
     </li>
     <li>
-      Tip 2:This is the second dialog I get on my laptop, this one is even harder to select keep.  You have to click on the down caret right next to the word Delete to show the "Keep anyway" option.
+      Tip 2: A second dialog may appear — this one is trickier. Click the down caret (▾) next to the word <strong>Delete</strong> to reveal the <strong>Keep anyway</strong> option.
       <figure style="margin:0; text-align:center;">
         <img src="assets/downloads_keepanyway.JPG" alt="Browser download warning: Keep anyway" style="max-width:95%; border-radius:0.6rem; box-shadow:0 2px 12px #0008;" />
         <figcaption style="color:#b0b0e0; font-size:0.97em; margin-top:0.4em;">If prompted, click <strong>Keep anyway</strong> to proceed with the download.</figcaption>
@@ -80,5 +80,17 @@
   <a href="get-started.html" style="color:#7a9aff; font-size:1.08em; font-weight:500; text-align:center; padding:0.7em 1.5em; border-radius:0.5em; background:#23234a; box-shadow:0 2px 12px #0004; text-decoration:none;">&larr; Back to Get Started</a>
 </div>
 
+<script>
+  fetch('policy.json')
+    .then(function(r) { return r.json(); })
+    .then(function(policy) {
+      var upgrade = policy && policy.upgrade;
+      if (!upgrade) return;
+      var btn = document.getElementById('download-btn');
+      if (upgrade.download_url) btn.href = upgrade.download_url;
+      if (upgrade.latest_version) btn.textContent = 'Download RollShare v' + upgrade.latest_version + ' for Windows';
+    })
+    .catch(function() { /* keep static fallback */ });
+</script>
 </body>
 </html>
