@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RollShare — Documentation</title>
+  <link rel="icon" href="assets/favicon.ico" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #12122a;
+      --fg: #dcdce6;
+      --panel: #1a1a36;
+      --border: #2d2d50;
+      --muted: #7878a0;
+      --arcane: #5b7fff;
+    }
+    body {
+      font-family: "Inter", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    header img { width: 28px; height: 28px; border-radius: 6px; }
+    header .brand { font-weight: 700; font-size: 1rem; color: #fff; }
+    header .sep { color: var(--border); margin: 0 0.2rem; }
+    header .page-title { font-size: 0.9rem; color: var(--muted); }
+    header nav { margin-left: auto; display: flex; gap: 1.2rem; }
+    header nav a {
+      font-size: 0.82rem; color: var(--muted); text-decoration: none;
+    }
+    header nav a:hover { color: var(--fg); }
+
+    main {
+      flex: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+      width: 100%;
+    }
+    .hero-icon {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1.5rem;
+    }
+    .hero-icon svg { color: var(--arcane); }
+    h1 { font-size: 2rem; font-weight: 700; color: #fff; }
+    .subtitle {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .coming-soon {
+      margin-top: 2.5rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+    }
+    .coming-soon p {
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .coming-soon p strong { color: var(--fg); }
+    .links {
+      margin-top: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+    .links a {
+      font-size: 0.85rem;
+      color: var(--arcane);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.9rem;
+      background: var(--panel);
+      transition: border-color 0.15s;
+    }
+    .links a:hover { border-color: var(--arcane); }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1rem 2rem;
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--fg); }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="assets/rollshare_logo.png" alt="RollShare" />
+  <span class="brand">RollShare</span>
+  <span class="sep">›</span>
+  <span class="page-title">Documentation</span>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="download.html">Download</a>
+    <a href="get-started.html">Get Started</a>
+  </nav>
+</header>
+
+<main>
+  <div class="hero-icon">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+    </svg>
+    <h1>Documentation</h1>
+  </div>
+  <p class="subtitle">
+    Step-by-step guides, troubleshooting tips, and everything you need to get the most out of RollShare.
+  </p>
+
+  <div class="coming-soon">
+    <p>
+      <strong>Full documentation is coming soon.</strong><br /><br />
+      In the meantime, the <a href="get-started.html" style="color:var(--arcane)">Get Started guide</a>
+      covers installation and first-run setup, and the
+      <a href="diy-instructions.html" style="color:var(--arcane)">DIY phone stand instructions</a>
+      will help you get the best camera angle for your dice tray.<br /><br />
+      Have a question or ran into a problem? Reach us on Discord — we're happy to help.
+    </p>
+    <div class="links">
+      <a href="get-started.html">📋 Get Started guide</a>
+      <a href="diy-instructions.html">🔧 DIY phone stand</a>
+      <a href="https://discord.gg/xKZcdB7Pfe">💬 Discord support</a>
+      <a href="download.html">⬇ Download RollShare</a>
+    </div>
+  </div>
+</main>
+
+<footer>
+  &copy; 2026 RollShare &nbsp;·&nbsp;
+  <a href="tos.html">Terms</a>
+</footer>
+
+</body>
+</html>
