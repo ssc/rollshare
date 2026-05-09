@@ -21,11 +21,11 @@
                                   }
                     },
     "upgrade":  {
-                    "latest_version":  "1.0.36",
+                    "latest_version":  "1.0.37",
                     "min_supported_version":  "1.0.0",
                     "grace_period_end_utc":  null,
                     "required":  false,
-                    "download_url":  "https://github.com/ssc/rollshare/releases/download/v1.0.36/RollShareSetup-1.0.36.exe",
+                    "download_url":  "https://github.com/ssc/rollshare/releases/download/v1.0.37/RollShareSetup-1.0.37.exe",
                     "notes_optional":  "A new version of DiceCamera is available. Please upgrade when convenient.",
                     "notes_required":  "This version of DiceCamera is no longer supported. Please update to continue.",
                     "beta_version":  "",
