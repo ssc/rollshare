@@ -14,6 +14,7 @@
         disable_session_recording: true,
         persistence: 'memory',
     });
+    posthog.register({ surface: 'app', subsurface: 'phoneui' });
     </script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -567,6 +568,7 @@
         var isAndroid = /android/i.test(ua);
 
         // ── PostHog event ─────────────────────────────────────────────────────────────────
+        if (uuid) posthog.identify(uuid);
         posthog.capture('onboard_page_viewed', { has_valid_params: valid, user_id: uuid || null });
 
         switchTab(isAndroid ? "android" : "ios");
