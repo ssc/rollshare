@@ -23,6 +23,28 @@
     .logo-icon svg { height: 3.25rem; width: 3.25rem; }
     .logo-name { font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif; font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.2; }
     .logo-subtitle { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.18em; color: #7878a0; }
+
+    /* ── Carousel ────────────────────────────── */
+    .carousel { position: relative; overflow: hidden; border-radius: 0.6rem; background: #12122a; margin: 1rem 0 0.5rem; }
+    .carousel-track { display: flex; transition: transform 0.35s ease; will-change: transform; }
+    .carousel-track img { width: 100%; flex-shrink: 0; display: block; }
+    .carousel-btn {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: #1a1a36cc; border: 1px solid #3a3a6a; color: #dcdce6;
+      border-radius: 50%; width: 2.2rem; height: 2.2rem; font-size: 1.1rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; z-index: 2; padding: 0;
+    }
+    .carousel-btn:hover { background: #3a3a6a; }
+    .carousel-btn.prev { left: 0.5rem; }
+    .carousel-btn.next { right: 0.5rem; }
+    .carousel-dots { display: flex; justify-content: center; gap: 0.4rem; margin: 0.5rem 0 0; }
+    .carousel-dots button {
+      width: 0.5rem; height: 0.5rem; border-radius: 50%; border: none;
+      background: #3a3a6a; cursor: pointer; padding: 0; transition: background 0.15s;
+    }
+    .carousel-dots button.active { background: #7a9aff; }
+    .carousel-count { text-align: center; font-size: 0.8rem; color: #5a5a8a; margin-top: 0.3rem; }
   </style>
 </head>
 <body>
@@ -53,15 +75,79 @@
   <div class="container">
     <h1 class="title">Get Started with <span class="text-grad-arcane">RollShare</span></h1>
     <div class="note">
-      <strong>Before you begin:</strong> Gather these items for the smoothest setup.
-      <ul style="margin-top:0.7rem; margin-bottom:0.7rem;">
-        <li>RollShare Dice Tray (<a href="diy-instructions.html" style="color:#7a9aff; font-size:0.97em; margin-left:0.5em;"><b>DIY Instructions</b></a> — <b>free</b> PDF + STL)</li>
-        <li>Physical dice (D6, D20, etc.)</li>
-        <li>Mobile Phone (iOS or Android)</li>
-        <li>Laptop with Zoom, Teams, or Discord</li>
-      </ul>
+      <div class="step-title" style="font-size:1.15rem;">Step 1 &mdash; Set up your dice tray</div>
+      <p class="step-body" style="margin:0.5rem 0 0.9rem;">We recommend doing this first &mdash; it will be difficult to get the app to work without it (and <strong style="color:#dcdce6;">this dice tray is free!</strong>). Print the template on 8.5&times;11 paper, cut on the solid lines, fold on the dotted lines, and use tape to secure the corners.</p>
+
+      <p style="margin:0.6rem 0 0.8rem; font-size:0.93rem;">
+        <strong style="color:#dcdce6;">Download the template:</strong>
+        &nbsp;<a href="assets/rollshare_dice_tray.pdf" download style="color:#7a9aff;">PDF (paper tray)</a>
+        &nbsp;&middot;&nbsp;
+        <a href="assets/rollshare_dice_tray.stl" download style="color:#7a9aff;">STL (3D print)</a>
+        &mdash; or if you have any flat-bottomed tray roughly <strong style="color:#dcdce6;">3.5&Prime; &times; 2.5&Prime;</strong> you can use skip to Step 2.
+      </p>
+
+      <div class="carousel" id="trayCarousel">
+        <div class="carousel-track" id="trayTrack">
+          <img src="assets/paper_tray_0.jpg" alt="Full setup ready to go" />
+          <img src="assets/paper_tray_1.jpg" alt="Dice tray template — print on 8.5x11" />
+          <img src="assets/paper_tray_2.jpg" alt="Cut along the solid lines" />
+          <img src="assets/paper_tray_3.jpg" alt="Fold on the dotted lines" />
+          <img src="assets/paper_tray_4.jpg" alt="Fold up the sides" />
+          <img src="assets/paper_tray_5.jpg" alt="Secure corners with tape" />
+          <img src="assets/paper_tray_6.jpg" alt="Finished tray" />
+          <img src="assets/paper_tray_7.jpg" alt="Tray in use" />
+          <img src="assets/paper_tray_8.jpg" alt="Phone on can above tray" />
+        </div>
+        <button class="carousel-btn prev" id="trayPrev" aria-label="Previous">&#8249;</button>
+        <button class="carousel-btn next" id="trayNext" aria-label="Next">&#8250;</button>
+      </div>
+      <div class="carousel-dots" id="trayDots"></div>
+      <div class="carousel-count" id="trayCount"></div>
+
+      <p style="margin-top:1rem; font-size:0.92rem; color:#a0a0c0;">
+        Make sure to place this in a comfortable / in-reach location on your desk, then move onto Step 2.
+      </p>
     </div>
-    <a href="download.html" class="download-btn">Continue to Download</a>
+
+    <script>
+    (function () {
+      const track = document.getElementById('trayTrack');
+      const slides = track.querySelectorAll('img');
+      const dotsEl = document.getElementById('trayDots');
+      const countEl = document.getElementById('trayCount');
+      const total = slides.length;
+      let cur = 0;
+
+      const dots = Array.from({ length: total }, (_, i) => {
+        const b = document.createElement('button');
+        b.addEventListener('click', () => go(i));
+        dotsEl.appendChild(b);
+        return b;
+      });
+
+      function go(n) {
+        cur = (n + total) % total;
+        track.style.transform = `translateX(-${cur * 100}%)`;
+        dots.forEach((d, i) => d.classList.toggle('active', i === cur));
+        countEl.textContent = `${cur + 1} / ${total}`;
+      }
+
+      document.getElementById('trayPrev').addEventListener('click', () => go(cur - 1));
+      document.getElementById('trayNext').addEventListener('click', () => go(cur + 1));
+
+      // Swipe support
+      let tx = 0;
+      track.parentElement.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+      track.parentElement.addEventListener('touchend', e => {
+        const dx = e.changedTouches[0].clientX - tx;
+        if (Math.abs(dx) > 40) go(dx < 0 ? cur + 1 : cur - 1);
+      }, { passive: true });
+
+      go(0);
+    })();
+    </script>
+
+    <a href="download.html" class="download-btn">Continue to Step 2: Download</a>
   </div>
 </body>
 </html>
