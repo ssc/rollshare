@@ -97,6 +97,34 @@
     }
     .links a:hover { border-color: var(--arcane); }
 
+    .faq { margin-top: 2.5rem; }
+    .faq h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 1.25rem;
+    }
+    .faq-item {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .faq-item .q {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 0.6rem;
+    }
+    .faq-item .a {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+    .faq-item .a strong { color: var(--fg); }
+    .faq-item .a a { color: var(--arcane); }
+
     footer {
       border-top: 1px solid var(--border);
       padding: 1rem 2rem;
@@ -138,18 +166,37 @@
     <p>
       <strong>Full documentation is coming soon.</strong><br /><br />
       In the meantime, the <a href="get-started.html" style="color:var(--arcane)">Get Started guide</a>
-      covers installation and first-run setup, and the
-      <a href="diy-instructions.html" style="color:var(--arcane)">DIY phone stand instructions</a>
-      will help you get the best camera angle for your dice tray.<br /><br />
+      covers installation and first-run setup.<br /><br />
       Have a question or ran into a problem? Reach us on Discord — we're happy to help.
     </p>
     <div class="links">
       <a href="get-started.html">📋 Get Started guide</a>
-      <a href="diy-instructions.html">🔧 DIY phone stand</a>
+      <a href="select-camera.html">🎥 Select DiceCamera</a>
+      <a href="release_notes.html">📄 Release Notes</a>
+      <a href="emailcodehelp.html">✉️ Email Code Help</a>
       <a href="https://discord.gg/xKZcdB7Pfe">💬 Discord support</a>
       <a href="download.html">⬇ Download RollShare</a>
     </div>
   </div>
+
+  <div class="faq">
+    <h2>Frequently Asked Questions</h2>
+
+    <div class="faq-item">
+      <div class="q">Why is my video displaying mirrored in my video conferencing app?</div>
+      <div class="a">
+        Most video conferencing apps (Zoom, Teams, Google Meet) automatically mirror your camera
+        preview <strong>on your own screen</strong> so it feels like looking in a mirror — this is
+        normal and only affects what <em>you</em> see. Your participants see the correct,
+        non-mirrored image.<br /><br />
+        If you want to confirm this, ask a participant or check the "Share screen" or "Spotlight"
+        view. If the image truly appears mirrored for everyone, look for a <strong>Mirror my
+        video</strong> or <strong>Flip horizontal</strong> option in your app's video settings and
+        make sure it is turned off.
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <footer>
