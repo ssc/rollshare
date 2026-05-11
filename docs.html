@@ -25,23 +25,65 @@
       display: flex;
       flex-direction: column;
     }
+    /* ── Header ── */
     header {
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-      padding: 0.75rem 2rem;
+      padding: 1.25rem 2rem;
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      justify-content: space-between;
     }
-    header img { width: 28px; height: 28px; border-radius: 6px; }
-    header .brand { font-weight: 700; font-size: 1rem; color: #fff; }
-    header .sep { color: var(--border); margin: 0 0.2rem; }
-    header .page-title { font-size: 0.9rem; color: var(--muted); }
-    header nav { margin-left: auto; display: flex; gap: 1.2rem; }
-    header nav a {
-      font-size: 0.82rem; color: var(--muted); text-decoration: none;
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      text-decoration: none;
+      color: var(--fg);
     }
-    header nav a:hover { color: var(--fg); }
+    .logo-icon {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      margin-right: -1px;
+    }
+    .logo-icon svg { height: 3.25rem; width: 3.25rem; }
+    .logo-name {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+    }
+    .logo-subtitle {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+    }
+    nav { display: flex; align-items: center; gap: 1.5rem; }
+    nav a {
+      font-size: 0.875rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    nav a:hover { color: var(--fg); }
+    /* On narrow screens, stack the nav below the logo so the header
+       has room to breathe instead of cramming everything on one line. */
+    @media (max-width: 640px) {
+      header {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.75rem 1.5rem;
+        padding: 1rem 1.25rem;
+      }
+      .logo { width: 100%; justify-content: center; }
+      nav {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.25rem;
+      }
+    }
 
     main {
       flex: 1;
@@ -139,10 +181,35 @@
 <body>
 
 <header>
-  <img src="assets/rollshare_logo.png" alt="RollShare" />
-  <span class="brand">RollShare</span>
-  <span class="sep">›</span>
-  <span class="page-title">Documentation</span>
+  <a href="index.html" class="logo">
+    <div class="logo-icon">
+      <!-- Isometric die — matches RollShare splash & logo -->
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Left face (face 3: three diagonal pips) -->
+        <polygon points="5.1,10 12,14 12,22 5.1,18" fill="#8c8c9b" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <!-- Right face (face 5: X pattern pips) -->
+        <polygon points="12,14 18.9,10 18.9,18 12,22" fill="#b9b9c8" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <!-- Top face (face 1: single center pip) -->
+        <polygon points="12,6 18.9,10 12,14 5.1,10" fill="#e4e4f0" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <!-- Top face pips: 1 dot at center (12, 10) -->
+        <ellipse cx="12" cy="10" rx="0.75" ry="0.52" fill="#191937"/>
+        <!-- Left face pips: 3 diagonal dots -->
+        <!-- top-left u=0.25 v=0.25 --> <ellipse cx="6.83" cy="13" rx="0.62" ry="0.44" transform="rotate(30 6.83 13)" fill="#191937"/>
+        <!-- center   u=0.50 v=0.50 --> <ellipse cx="8.55" cy="16" rx="0.62" ry="0.44" transform="rotate(30 8.55 16)" fill="#191937"/>
+        <!-- bot-right u=0.75 v=0.75 --> <ellipse cx="10.28" cy="19" rx="0.62" ry="0.44" transform="rotate(30 10.28 19)" fill="#191937"/>
+        <!-- Right face pips: 5 X-pattern dots -->
+        <!-- top-left     u=0.2 v=0.2 --> <ellipse cx="13.38" cy="14.8" rx="0.62" ry="0.44" transform="rotate(-30 13.38 14.8)" fill="#191937"/>
+        <!-- top-right    u=0.8 v=0.2 --> <ellipse cx="17.52" cy="12.4" rx="0.62" ry="0.44" transform="rotate(-30 17.52 12.4)" fill="#191937"/>
+        <!-- center       u=0.5 v=0.5 --> <ellipse cx="15.45" cy="16"   rx="0.62" ry="0.44" transform="rotate(-30 15.45 16)"   fill="#191937"/>
+        <!-- bot-left     u=0.2 v=0.8 --> <ellipse cx="13.38" cy="19.6" rx="0.62" ry="0.44" transform="rotate(-30 13.38 19.6)" fill="#191937"/>
+        <!-- bot-right    u=0.8 v=0.8 --> <ellipse cx="17.52" cy="17.2" rx="0.62" ry="0.44" transform="rotate(-30 17.52 17.2)" fill="#191937"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-name">ROLL SHARE</div>
+      <div class="logo-subtitle">A better way to play together</div>
+    </div>
+  </a>
   <nav>
     <a href="index.html">Home</a>
     <a href="download.html">Download</a>
