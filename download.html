@@ -86,7 +86,7 @@
   </div>
 
 <script>
-  fetch('policy.json')
+  fetch('policy.json?v=' + Date.now())
     .then(function(r) { return r.json(); })
     .then(function(policy) {
       var upgrade = policy && policy.upgrade;
