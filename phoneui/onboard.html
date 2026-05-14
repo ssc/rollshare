@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>RollShare — Connect Your Phone</title>
     <script>
+    // Decode p= early so we can suppress PostHog in dev mode (schema 2, dev field = 1).
+    (function() {
+        try {
+            var _p = new URLSearchParams(window.location.search).get('p') || '';
+            if (_p) {
+                var _b = _p.replace(/-/g,'+').replace(/_/g,'/');
+                while (_b.length % 4) _b += '=';
+                var _parts = atob(_b).split('|');
+                var _schema = parseInt(_parts[0], 10);
+                if (_schema === 2 && _parts[4] === '1') { window._rollshare_dev = true; }
+            }
+        } catch(e) {}
+    })();
+    if (!window._rollshare_dev) {
     !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+" (stub)"},o="init bs ws ge fs capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
     posthog.init('phc_znGJ5C6tARtEWQkCkyRJmWsEna3iq7ds4FquU93F6fAE', {
         api_host: 'https://us.i.posthog.com',
@@ -15,6 +29,7 @@
         persistence: 'memory',
     });
     posthog.register({ surface: 'app', subsurface: 'phoneui' });
+    }
     </script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -445,7 +460,13 @@
                 var maybeSchema = parseInt(parts[0], 10);
                 if (!isNaN(maybeSchema) && /^\d+$/.test(parts[0])) {
                     // Versioned format: schema|ip|port[|uuid]
-                    if (maybeSchema > 1) {
+                    if (maybeSchema === 2) {
+                        // Schema 2: 2|ip|port|uuid|dev
+                        ip   = parts[1] || "";
+                        port = parts[2] || "";
+                        uuid = parts[3] || "";
+                        // dev flag already decoded in <head> into window._rollshare_dev
+                    } else if (maybeSchema > 2) {
                         schemaError = true;  // newer format, can't decode safely
                     } else {
                         // schema == 1
@@ -569,7 +590,7 @@
 
         // ── PostHog event ─────────────────────────────────────────────────────────────────
         if (uuid) posthog.identify(uuid);
-        posthog.capture('onboard_page_viewed', { has_valid_params: valid, user_id: uuid || null });
+        if (!window._rollshare_dev) posthog.capture('onboard_page_viewed', { has_valid_params: valid, user_id: uuid || null });
 
         switchTab(isAndroid ? "android" : "ios");
     })();
