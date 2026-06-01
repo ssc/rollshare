@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Phone Connection Troubleshooting — RollShare</title>
+  <link rel="icon" href="assets/favicon.ico" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <script src="assets/ph-site.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #12122a;
+      --fg: #dcdce6;
+      --panel: #1a1a36;
+      --border: #2d2d50;
+      --muted: #7878a0;
+      --arcane: #5b7fff;
+    }
+    body {
+      font-family: "Inter", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      text-decoration: none;
+      color: var(--fg);
+    }
+    .logo-icon { display: flex; align-items: center; flex-shrink: 0; margin-right: -1px; }
+    .logo-icon svg { height: 3.25rem; width: 3.25rem; }
+    .logo-name {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+    }
+    .logo-subtitle {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+    }
+    nav { display: flex; align-items: center; gap: 1.5rem; }
+    nav a {
+      font-size: 0.875rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    nav a:hover { color: var(--fg); }
+    @media (max-width: 640px) {
+      header { flex-wrap: wrap; justify-content: center; gap: 0.75rem 1.5rem; padding: 1rem 1.25rem; }
+      .logo { width: 100%; justify-content: center; }
+      nav { width: 100%; justify-content: center; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+    }
+    main {
+      flex: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+      width: 100%;
+    }
+    .hero {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      margin-bottom: 1.5rem;
+    }
+    .hero svg { color: var(--arcane); flex-shrink: 0; }
+    h1 { font-size: 2rem; font-weight: 700; color: #fff; }
+    .subtitle {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .section-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin: 2.5rem 0 0.85rem;
+      font-weight: 600;
+    }
+    .tip-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.3rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .tip-icon {
+      font-size: 1.4rem;
+      flex-shrink: 0;
+      line-height: 1;
+      margin-top: 0.05rem;
+    }
+    .tip-body {}
+    .tip-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 0.3rem;
+    }
+    .tip-desc {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+    .tip-desc strong { color: var(--fg); }
+    .tip-desc a { color: var(--arcane); }
+
+    .tip-card.highlight {
+      border-color: #3a5ce8;
+      background: #1a1a3e;
+    }
+
+    .bottom-links {
+      margin-top: 2.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .bottom-links a {
+      font-size: 0.85rem;
+      color: var(--arcane);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.9rem;
+      background: var(--panel);
+      transition: border-color 0.15s;
+    }
+    .bottom-links a:hover { border-color: var(--arcane); }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1rem 2rem;
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--fg); }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="5.1,10 12,14 12,22 5.1,18" fill="#8c8c9b" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <polygon points="12,14 18.9,10 18.9,18 12,22" fill="#b9b9c8" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <polygon points="12,6 18.9,10 12,14 5.1,10" fill="#e4e4f0" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <ellipse cx="12" cy="10" rx="0.75" ry="0.52" fill="#191937"/>
+        <ellipse cx="6.83" cy="13" rx="0.62" ry="0.44" transform="rotate(30 6.83 13)" fill="#191937"/>
+        <ellipse cx="8.55" cy="16" rx="0.62" ry="0.44" transform="rotate(30 8.55 16)" fill="#191937"/>
+        <ellipse cx="10.28" cy="19" rx="0.62" ry="0.44" transform="rotate(30 10.28 19)" fill="#191937"/>
+        <ellipse cx="13.38" cy="14.8" rx="0.62" ry="0.44" transform="rotate(-30 13.38 14.8)" fill="#191937"/>
+        <ellipse cx="17.52" cy="12.4" rx="0.62" ry="0.44" transform="rotate(-30 17.52 12.4)" fill="#191937"/>
+        <ellipse cx="15.45" cy="16" rx="0.62" ry="0.44" transform="rotate(-30 15.45 16)" fill="#191937"/>
+        <ellipse cx="13.38" cy="19.6" rx="0.62" ry="0.44" transform="rotate(-30 13.38 19.6)" fill="#191937"/>
+        <ellipse cx="17.52" cy="17.2" rx="0.62" ry="0.44" transform="rotate(-30 17.52 17.2)" fill="#191937"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-name">ROLL SHARE</div>
+      <div class="logo-subtitle">A better way to play together</div>
+    </div>
+  </a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="download.html">Download</a>
+    <a href="get-started.html">Get Started</a>
+  </nav>
+</header>
+
+<main>
+  <div class="hero">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+      <line x1="12" y1="18" x2="12.01" y2="18"/>
+    </svg>
+    <h1>Phone Connection Help</h1>
+  </div>
+  <p class="subtitle">
+    Having trouble getting your phone to connect to RollShare? Work through these tips from top to bottom.
+  </p>
+
+  <div class="section-title">Most Common Fixes</div>
+
+  <div class="tip-card highlight">
+    <div class="tip-icon">📶</div>
+    <div class="tip-body">
+      <div class="tip-title">Make sure your phone is on the same WiFi as your laptop</div>
+      <div class="tip-desc">
+        RollShare connects directly over your local network — both devices <strong>must be on the
+        same WiFi network</strong>. If your laptop is on one network and your phone is on another
+        (or on mobile data), they can't reach each other.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">📄</div>
+    <div class="tip-body">
+      <div class="tip-title">Close extra browser tabs pointing to the RollShare camera page</div>
+      <div class="tip-desc">
+        If your phone browser has <strong>more than one tab open</strong> to the RollShare camera
+        page, the tabs will compete for the camera and WebRTC connection. Close all but one.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">🔄</div>
+    <div class="tip-body">
+      <div class="tip-title">Toggle your phone's WiFi off and back on</div>
+      <div class="tip-desc">
+        Stale WiFi state can prevent a new connection from establishing. Turn WiFi off on your
+        phone, wait a couple of seconds, and turn it back on. Then re-scan the QR code.
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Fallback Options</div>
+
+  <div class="tip-card highlight">
+    <div class="tip-icon">📱</div>
+    <div class="tip-body">
+      <div class="tip-title">Use your phone as a WiFi hotspot and have your laptop join it</div>
+      <div class="tip-desc">
+        This is the most reliable workaround if your router is causing problems. Enable
+        <strong>Mobile Hotspot</strong> on your phone, connect your laptop to it, then restart
+        RollShare. Your phone and laptop will be on a direct network with no router in the way.
+        <br /><br />
+        <strong>Note:</strong> your laptop will use your phone's mobile data while connected to
+        the hotspot.
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Other Things to Check</div>
+
+  <div class="tip-card">
+    <div class="tip-icon">🚫</div>
+    <div class="tip-body">
+      <div class="tip-title">Avoid guest or public WiFi networks</div>
+      <div class="tip-desc">
+        Many guest and public WiFi networks enable <strong>AP isolation</strong>, which prevents
+        devices on the same network from talking to each other directly. Use a personal home or
+        office WiFi network instead.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">🛡️</div>
+    <div class="tip-body">
+      <div class="tip-title">Check your VPN and firewall</div>
+      <div class="tip-desc">
+        If you're running a <strong>VPN</strong>, try disconnecting it — VPNs often route traffic
+        in a way that blocks local device discovery. Also make sure Windows Firewall isn't
+        blocking the RollShare companion app (look for a firewall prompt on first launch and
+        click Allow).
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">🔁</div>
+    <div class="tip-body">
+      <div class="tip-title">Re-scan the QR code if you've been waiting a while</div>
+      <div class="tip-desc">
+        The connection URL includes your laptop's local IP address. If that address changed
+        (e.g. after a reconnect or sleep), the old QR code won't work — just scan the current
+        one shown in the app.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">🌐</div>
+    <div class="tip-body">
+      <div class="tip-title">Use Chrome or Safari on your phone</div>
+      <div class="tip-desc">
+        RollShare uses WebRTC for the camera stream. <strong>Chrome</strong> (Android) and
+        <strong>Safari</strong> (iOS) have the best WebRTC support. Firefox may work but can
+        behave differently; other browsers are untested.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">📷</div>
+    <div class="tip-body">
+      <div class="tip-title">Allow camera permission in your browser</div>
+      <div class="tip-desc">
+        When you first open the RollShare camera page, your browser will ask for camera access.
+        Make sure you tap <strong>Allow</strong>. If you previously denied it, go to your
+        browser's site settings and reset the permission.
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-links">
+    <a href="get-started.html">📋 Get Started guide</a>
+    <a href="https://discord.gg/xKZcdB7Pfe">💬 Ask on Discord</a>
+    <a href="docs.html">📖 Documentation</a>
+  </div>
+</main>
+
+<footer>
+  &copy; 2026 RollShare &nbsp;·&nbsp;
+  <a href="tos.html">Terms</a>
+</footer>
+
+</body>
+</html>
