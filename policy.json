@@ -31,5 +31,14 @@
                     "beta_version":  "",
                     "beta_download_url":  "",
                     "release_notes_url":  "http://ssc.github.io/rollshare/release_notes.html"
+                },
+    "roll_upload":  {
+                    "enabled":           true,
+                    "context_jpg":       true,
+                    "crops_png":         true,
+                    "crop_padding_pct":  25,
+                    "browser_frame_png": false,
+                    "background_frame_png":    false,
+                    "background_frame_sf_png": false
                 }
 }
