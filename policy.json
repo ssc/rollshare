@@ -1,44 +1,42 @@
 {
-    "schema_version":  1,
-    "policy_version":  "2026-05-06.1",
-    "generated_at_utc":  "2026-05-07T02:12:38Z",
-    "expires_at_utc":  "2026-05-14T02:12:38Z",
-    "max_stale_days":  7,
-    "kill_switch":  {
-                        "blocked":  false,
-                        "start_utc":  null,
-                        "end_utc":  null,
-                        "reason_code":  "none",
-                        "title":  "Service unavailable",
-                        "message":  "DiceCamera is temporarily unavailable. Please try again later.",
-                        "learn_more_url":  "https://ssc.github.io/rollshare/status",
-                        "scope":  {
-                                      "platform":  [
-
-                                                   ],
-                                      "min_version":  "",
-                                      "max_version":  ""
-                                  }
-                    },
-    "upgrade":  {
-                    "latest_version":  "1.0.72",
-                    "min_supported_version":  "1.0.0",
-                    "grace_period_end_utc":  null,
-                    "required":  false,
-                    "download_url":  "https://github.com/ssc/rollshare/releases/download/v1.0.72/RollShareSetup-1.0.72.exe",
-                    "notes_optional":  "A new version of DiceCamera is available. Please upgrade when convenient.",
-                    "notes_required":  "This version of DiceCamera is no longer supported. Please update to continue.",
-                    "beta_version":  "",
-                    "beta_download_url":  "",
-                    "release_notes_url":  "http://ssc.github.io/rollshare/release_notes.html"
-                },
-    "roll_upload":  {
-                    "enabled":           true,
-                    "context_jpg":       true,
-                    "crops_png":         true,
-                    "crop_padding_pct":  25,
-                    "browser_frame_png": false,
-                    "background_frame_png":    false,
-                    "background_frame_sf_png": false
-                }
+  "schema_version": 1,
+  "policy_version": "2026-05-06.1",
+  "generated_at_utc": "2026-05-07T02:12:38Z",
+  "expires_at_utc": "2026-05-14T02:12:38Z",
+  "max_stale_days": 7,
+  "kill_switch": {
+    "blocked": false,
+    "start_utc": null,
+    "end_utc": null,
+    "reason_code": "none",
+    "title": "Service unavailable",
+    "message": "DiceCamera is temporarily unavailable. Please try again later.",
+    "learn_more_url": "https://ssc.github.io/rollshare/status",
+    "scope": {
+      "platform": [],
+      "min_version": "",
+      "max_version": ""
+    }
+  },
+  "upgrade": {
+    "latest_version": "1.0.76",
+    "min_supported_version": "1.0.0",
+    "grace_period_end_utc": null,
+    "required": false,
+    "download_url": "https://github.com/ssc/rollshare/releases/download/v1.0.76/RollShareSetup-1.0.76.exe",
+    "notes_optional": "A new version of DiceCamera is available. Please upgrade when convenient.",
+    "notes_required": "This version of DiceCamera is no longer supported. Please update to continue.",
+    "beta_version": "",
+    "beta_download_url": "",
+    "release_notes_url": "http://ssc.github.io/rollshare/release_notes.html"
+  },
+  "roll_upload": {
+    "enabled": true,
+    "context_jpg": true,
+    "crops_png": true,
+    "crop_padding_pct": 25,
+    "browser_frame_png": false,
+    "background_frame_png": false,
+    "background_frame_sf_png": false
+  }
 }
