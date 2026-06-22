@@ -291,6 +291,7 @@
   var lastMotionFrame = 0;
   var settleFired     = false;
   var uploading       = false;
+  var anonSignedIn    = false;   // set true once signInAnonymously() resolves
   var frameTimerId    = null;
   var sfCanvas        = null;
   var capCanvas       = null;
@@ -440,8 +441,11 @@
         // requires non-null auth.uid(); bare anon key has null uid).
         supabase.auth.signInAnonymously().then(function(res) {
           if (res.error) {
-            dbg('anon sign-in failed: ' + res.error.message, 'warn');
+            dbg('anon sign-in failed: ' + res.error.message, 'error');
+            // Surface a visible warning — uploads will be blocked until this is resolved
+            setStatus('⚠️', 'Sign-in failed', 'Anonymous auth error: ' + res.error.message);
           } else {
+            anonSignedIn = true;
             dbg('anon sign-in ok uid=' + (res.data && res.data.user ? res.data.user.id.slice(-6) : '?'));
           }
         });
@@ -596,6 +600,11 @@
   // ── Upload on settle ──────────────────────────────────────────────────────
   async function uploadSettledFrame(peakBeforeSettle, seq) {
     if (!supabase) return;
+    if (!anonSignedIn) {
+      dbg('upload skipped — anonymous sign-in not yet complete', 'warn');
+      setStatus('⏳', 'Waiting for auth…', 'Anonymous sign-in pending, will retry next settle');
+      return;
+    }
     uploading = true;
     setStatus('☁️', 'Settled — uploading…', 'Sending frame to RollShare');
     uploadWrap.style.display = ''; uploadBar.style.width = '30%';
