@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -254,6 +254,7 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
+  var APP_VERSION    = '1.0.86';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -458,6 +459,7 @@
                 type: 'broadcast', event: 'hello',
                 payload: {
                   type: 'hello',
+                  app_version: APP_VERSION,
                   ua: navigator.userAgent,
                   platform: navigator.platform || '',
                   screen: screen.width + 'x' + screen.height,
@@ -548,6 +550,15 @@
   var dbgPanel = document.getElementById('dbg-panel');
   var debugMode = /[?&]debug/.test(window.location.search) || /[?&]dev=1/.test(window.location.search);
   if (debugMode) dbgPanel.classList.add('visible');
+  // Log version immediately so it appears at the top of the debug panel
+  // (broadcastChannel not yet open here, so console-only)
+  console.log('[cloud] phoneui-cloud v' + APP_VERSION);
+  if (debugMode) {
+    var _verEl = document.createElement('div');
+    _verEl.style.color = '#86efac';
+    _verEl.textContent = 'phoneui-cloud v' + APP_VERSION;
+    dbgPanel.appendChild(_verEl);
+  }
   var _remoteLogSeq = 0;
   function dbg(msg, level) {
     var ts = new Date().toISOString().slice(11, 23);
