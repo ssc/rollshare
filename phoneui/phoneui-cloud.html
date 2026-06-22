@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RollShare — Cloud Camera</title>
   <script>
-    // Read params early for dev mode detection (suppress PostHog when ?dev=1).
     (function() {
       var _p = new URLSearchParams(window.location.search);
       if (_p.get('dev') === '1') window._rollshare_dev = true;
@@ -31,121 +30,125 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 1.5rem 1rem;
-      text-align: center;
+      padding: 0.85rem 0.85rem 1.5rem;
     }
-    header {
-      margin-bottom: 1.5rem;
-    }
-    header h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: -0.02em;
-    }
-    header p { color: #888; font-size: 0.85rem; margin-top: 0.2rem; }
+    header { margin-bottom: 0.65rem; text-align: center; }
+    header h1 { font-size: 1.3rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+    header p  { color: #777; font-size: 0.8rem; margin-top: 0.1rem; }
 
     #error-banner {
       display: none;
-      background: #3a0a0a;
-      border: 1px solid #c0392b;
-      border-radius: 10px;
-      padding: 1rem 1.2rem;
-      margin-bottom: 1.5rem;
-      color: #f5b7b1;
-      font-size: 0.9rem;
-      line-height: 1.5;
-      max-width: 380px;
-      width: 100%;
+      background: #3a0a0a; border: 1px solid #c0392b; border-radius: 10px;
+      padding: 0.85rem 1rem; margin-bottom: 0.75rem;
+      color: #f5b7b1; font-size: 0.86rem; line-height: 1.5;
+      width: 100%; max-width: 460px;
     }
-    #error-banner strong { color: #f1948a; display: block; margin-bottom: 0.3rem; }
+    #error-banner strong { color: #f1948a; display: block; margin-bottom: 0.2rem; }
 
-    #status-card {
-      background: #111c17;
-      border: 1px solid #1f3d2d;
-      border-radius: 14px;
-      padding: 1.5rem 1.6rem;
-      max-width: 380px;
-      width: 100%;
-      margin-bottom: 1rem;
+    /* ── Camera preview ── */
+    #preview-wrap {
+      width: 100%; max-width: 460px;
+      position: relative;
+      border-radius: 12px; overflow: hidden;
+      background: #111;
+      aspect-ratio: 4/3;
+      margin-bottom: 0.65rem;
     }
-    #status-icon {
-      font-size: 2.5rem;
-      margin-bottom: 0.7rem;
-      line-height: 1;
+    #cam-video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      transform: scaleX(-1); /* mirror so scene looks natural; dice orientation unaffected */
     }
-    #status-text {
-      font-size: 1rem;
-      font-weight: 600;
-      color: #86efac;
-      margin-bottom: 0.3rem;
+    #preview-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(10,10,26,0.85);
+      font-size: 0.88rem; color: #888; gap: 0.45rem;
     }
-    #status-sub {
-      font-size: 0.82rem;
-      color: #6b9b7a;
+    #preview-overlay.hidden { display: none; }
+    #preview-overlay .pi { font-size: 2rem; }
+
+    /* motion indicator dot — top-right corner of preview */
+    #motion-dot {
+      position: absolute; top: 8px; right: 8px;
+      width: 11px; height: 11px; border-radius: 50%;
+      background: #333;
+      transition: background 0.08s;
     }
-    #session-chip {
-      display: inline-block;
-      background: #1a3526;
-      border: 1px solid #2a5038;
-      border-radius: 20px;
-      padding: 0.2rem 0.65rem;
-      font-size: 0.72rem;
-      color: #86efac;
-      margin-top: 0.8rem;
-      font-family: monospace;
-      letter-spacing: 0.05em;
+    #motion-dot.active { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+
+    /* ── Status bar ── */
+    #status-bar {
+      width: 100%; max-width: 460px;
+      background: #111c17; border: 1px solid #1f3d2d; border-radius: 10px;
+      padding: 0.55rem 0.9rem;
+      display: flex; align-items: center; gap: 0.55rem;
+      margin-bottom: 0.6rem;
     }
+    #status-icon { font-size: 1.3rem; flex-shrink: 0; }
+    #status-text { font-size: 0.86rem; font-weight: 600; color: #86efac; }
+    #status-sub  { font-size: 0.74rem; color: #6b9b7a; margin-top: 0.05rem; }
+    #session-chip { font-family: monospace; font-size: 0.66rem; color: #4a8a60; margin-top: 0.1rem; letter-spacing: 0.04em; }
+
+    /* ── Controls ── */
+    #controls { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 0.45rem; }
+
+    /* camera selector — native select overlaid on a styled div */
+    #camera-select-wrap { position: relative; width: 100%; }
+    #camera-select-face {
+      width: 100%; padding: 0.55rem 2rem 0.55rem 0.7rem;
+      background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
+      color: #ccc; font-size: 0.84rem; text-align: left; user-select: none;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #camera-select-face::after {
+      content: "BE";
+      position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%);
+      color: #555; pointer-events: none;
+    }
+    #cameraSelect {
+      position: absolute; inset: 0; opacity: 0;
+      width: 100%; height: 100%; cursor: pointer;
+    }
+
+    /* torch + start row */
+    #action-row { display: flex; gap: 0.45rem; }
+    #torch-btn {
+      flex-shrink: 0;
+      padding: 0.6rem 0.85rem;
+      background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
+      color: #ccc; font-size: 0.84rem; cursor: pointer;
+      display: none; /* shown after camera opens if torch capable */
+    }
+    #torch-btn.on { background: #292910; border-color: #6a6a10; color: #facc15; }
+    #torch-btn:disabled { opacity: 0.4; cursor: default; }
 
     #start-btn {
-      display: block;
-      width: 100%;
-      max-width: 380px;
-      margin-top: 0.5rem;
-      padding: 0.9rem 1rem;
-      background: #16a34a;
-      color: #f0faf4;
-      font-size: 1rem;
-      font-weight: 700;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: background 0.15s;
+      flex: 1; padding: 0.62rem 1rem;
+      background: #16a34a; color: #f0faf4;
+      font-size: 0.94rem; font-weight: 700;
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: background 0.12s;
     }
     #start-btn:hover { background: #15803d; }
     #start-btn:active { background: #14532d; }
     #start-btn:disabled { background: #1a3020; color: #3a6040; cursor: default; }
 
+    /* upload progress */
     #upload-bar-wrap {
-      display: none;
-      width: 100%;
-      max-width: 380px;
-      height: 4px;
-      background: #1a2a1a;
-      border-radius: 2px;
-      margin-top: 0.75rem;
-      overflow: hidden;
+      display: none; margin-top: 0.45rem;
+      width: 100%; max-width: 460px;
+      height: 3px; background: #1a2a1a; border-radius: 2px; overflow: hidden;
     }
-    #upload-bar {
-      height: 100%;
-      width: 0%;
-      background: #16a34a;
-      border-radius: 2px;
-      transition: width 0.2s;
-    }
+    #upload-bar { height: 100%; width: 0%; background: #16a34a; border-radius: 2px; transition: width 0.2s; }
 
-    footer { margin-top: 2rem; font-size: 0.73rem; color: #333; }
-
-    /* hidden video */
-    video { display: none; }
+    footer { margin-top: auto; padding-top: 0.85rem; font-size: 0.68rem; color: #2a2a3a; text-align: center; }
   </style>
 </head>
 <body>
 
 <header>
   <h1>RollShare Cloud</h1>
-  <p>Point your phone at the dice tray</p>
+  <p>Point your phone down at the dice tray</p>
 </header>
 
 <div id="error-banner" role="alert">
@@ -153,19 +156,41 @@
   <span id="error-msg">Check that the QR code is valid and the Companion App is running.</span>
 </div>
 
-<div id="status-card">
-  <div id="status-icon">📷</div>
-  <div id="status-text">Waiting to start…</div>
-  <div id="status-sub">Tap the button below to begin</div>
-  <div id="session-chip" style="display:none"></div>
+<!-- Camera preview -->
+<div id="preview-wrap">
+  <video id="cam-video" autoplay playsinline muted></video>
+  <div id="preview-overlay">
+    <span class="pi">📷</span>
+    <span>Tap “Start camera” below</span>
+  </div>
+  <div id="motion-dot" title="Motion indicator"></div>
 </div>
 
-<button id="start-btn">Start camera</button>
+<!-- Status -->
+<div id="status-bar">
+  <span id="status-icon">⏳</span>
+  <div>
+    <div id="status-text">Ready</div>
+    <div id="status-sub">Tap Start camera to begin</div>
+    <div id="session-chip"></div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <div id="camera-select-wrap">
+    <div id="camera-select-face">Default rear camera</div>
+    <select id="cameraSelect" aria-label="Select camera"></select>
+  </div>
+  <div id="action-row">
+    <button id="torch-btn" title="Toggle torch">🔦 Torch</button>
+    <button id="start-btn">Start camera</button>
+  </div>
+</div>
+
 <div id="upload-bar-wrap"><div id="upload-bar"></div></div>
 
-<video id="cam-video" autoplay playsinline muted></video>
-
-<footer>Cloud path · video never stored permanently</footer>
+<footer>Cloud path · frames uploaded on settle only · video never stored permanently</footer>
 
 <script>
 (function () {
@@ -175,274 +200,372 @@
   var MOTION_THRESHOLD_MIN        = 3;
   var MOTION_THRESHOLD_MULTIPLIER = 2.0;
   var MOTION_NOISE_EMA_ALPHA      = 0.02;
-  var JUST_SETTLED_DELAY_FRAMES   = 4;   // ~0.33 s at 12 fps
+  var JUST_SETTLED_DELAY_FRAMES   = 4;
   var GRAB_SPIKE_WINDOW           = 20;
   var GRAB_THRESHOLD              = 35.0;
 
-  // ── MotionDetector (JS port of motion_detector.py) ────────────────────────
+  // iOS Safari only allows one active camera at a time; avoid probing all cameras.
+  var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // ── MotionDetector ────────────────────────────────────────────────────────
   function MotionDetector() {
     this.noiseEma  = MOTION_THRESHOLD_MIN / MOTION_THRESHOLD_MULTIPLIER;
     this.prevGray  = null;
-    this.history   = [];  // rolling diffMean, maxlen 300
+    this.history   = [];
     this.threshold = MOTION_THRESHOLD_MIN;
   }
-
-  MotionDetector.prototype.update = function (grayPixels) {
+  MotionDetector.prototype.update = function (gray) {
     var diffMean = 0;
     this.threshold = Math.max(MOTION_THRESHOLD_MIN, this.noiseEma * MOTION_THRESHOLD_MULTIPLIER);
     if (this.prevGray) {
       var sum = 0;
-      for (var i = 0; i < grayPixels.length; i++)
-        sum += Math.abs(grayPixels[i] - this.prevGray[i]);
-      diffMean = sum / grayPixels.length;
+      for (var i = 0; i < gray.length; i++) sum += Math.abs(gray[i] - this.prevGray[i]);
+      diffMean = sum / gray.length;
       if (diffMean < this.threshold)
         this.noiseEma = MOTION_NOISE_EMA_ALPHA * diffMean + (1 - MOTION_NOISE_EMA_ALPHA) * this.noiseEma;
       this.threshold = Math.max(MOTION_THRESHOLD_MIN, this.noiseEma * MOTION_THRESHOLD_MULTIPLIER);
     }
-    this.prevGray = grayPixels.slice();
+    this.prevGray = gray.slice();
     if (this.history.length >= 300) this.history.shift();
     this.history.push(diffMean);
-    return { inMotion: diffMean > this.threshold, diffMean: diffMean };
+    return { inMotion: diffMean > this.threshold };
   };
-
-  MotionDetector.prototype.peakBeforeSettle = function (settleDelay, window) {
-    var n     = this.history.length;
-    var end   = n - settleDelay;
-    var start = end - window;
+  MotionDetector.prototype.peakBeforeSettle = function (delay, win) {
+    var n = this.history.length, end = n - delay, start = end - win;
     if (start < 0 || end <= 0) return 0;
-    var peak = 0;
-    var slice = this.history.slice(start, end);
-    for (var i = 0; i < slice.length; i++) if (slice[i] > peak) peak = slice[i];
-    return peak;
+    var pk = 0;
+    for (var i = start; i < end; i++) if (this.history[i] > pk) pk = this.history[i];
+    return pk;
   };
-
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
-  // ── Globals ────────────────────────────────────────────────────────────────
-  var params    = new URLSearchParams(window.location.search);
-  var sessionId = params.get('s') || '';
-  var isDev     = params.get('dev') === '1';
+  // ── Globals ───────────────────────────────────────────────────────────────
+  var params         = new URLSearchParams(window.location.search);
+  var rendezvousKey  = params.get('s') || '';
+  var isDev          = params.get('dev') === '1';
 
-  // UI refs
-  var statusCard  = document.getElementById('status-card');
-  var statusIcon  = document.getElementById('status-icon');
-  var statusText  = document.getElementById('status-text');
-  var statusSub   = document.getElementById('status-sub');
-  var sessionChip = document.getElementById('session-chip');
-  var startBtn    = document.getElementById('start-btn');
-  var errorBanner = document.getElementById('error-banner');
-  var errorTitle  = document.getElementById('error-title');
-  var errorMsg    = document.getElementById('error-msg');
-  var uploadWrap  = document.getElementById('upload-bar-wrap');
-  var uploadBar   = document.getElementById('upload-bar');
-  var video       = document.getElementById('cam-video');
+  var video           = document.getElementById('cam-video');
+  var previewOverlay  = document.getElementById('preview-overlay');
+  var motionDot       = document.getElementById('motion-dot');
+  var statusIcon      = document.getElementById('status-icon');
+  var statusText      = document.getElementById('status-text');
+  var statusSub       = document.getElementById('status-sub');
+  var sessionChip     = document.getElementById('session-chip');
+  var startBtn        = document.getElementById('start-btn');
+  var torchBtn        = document.getElementById('torch-btn');
+  var cameraSelect    = document.getElementById('cameraSelect');
+  var cameraFace      = document.getElementById('camera-select-face');
+  var errorBanner     = document.getElementById('error-banner');
+  var errorTitle      = document.getElementById('error-title');
+  var errorMsg        = document.getElementById('error-msg');
+  var uploadWrap      = document.getElementById('upload-bar-wrap');
+  var uploadBar       = document.getElementById('upload-bar');
 
-  var motionDetector = new MotionDetector();
-  var supabase       = null;
-  var frameSeq       = 0;
+  var motionDetector  = new MotionDetector();
+  var supabase        = null;
+  var broadcastChannel = null;   // Supabase Realtime broadcast channel
+  var lastHeartbeatTs  = 0;      // epoch ms of last Companion heartbeat received
+  var heartbeatWatchId = null;   // setInterval id for zombie detection
+  var currentStream   = null;
+  var videoTrack      = null;
+  var torchEnabled    = false;
+  var torchIds        = new Set();
+  var currentDeviceId = null;
+  var cameraStarted   = false;
+  var frameSeq        = 0;
   var lastMotionFrame = 0;
-  var settleFired    = false;
-  var uploading      = false;
-  var frameTimerId   = null;
-  var capCanvas      = null;  // 320×240 for PNG upload
-  var sfCanvas       = null;  // 160×120 for motion detection
+  var settleFired     = false;
+  var uploading       = false;
+  var frameTimerId    = null;
+  var sfCanvas        = null;
+  var capCanvas       = null;
 
-  // ── Validate session ID ────────────────────────────────────────────────────
-  if (!sessionId || sessionId.length < 10) {
-    showError('Invalid link', 'This QR code is missing the session ID. Please rescan the QR code shown on the RollShare Companion App.');
+  // ── Rendezvous key validation ─────────────────────────────────────────────
+  if (!rendezvousKey || rendezvousKey.length < 10) {
+    showError('Invalid link', 'This QR code is missing the rendezvous key. Please rescan the QR code shown on the RollShare Companion App.');
     startBtn.disabled = true;
   } else {
-    // Show last 6 chars of session ID as a pairing confirmation
-    sessionChip.textContent = 'Session …' + sessionId.slice(-6);
-    sessionChip.style.display = '';
+    sessionChip.textContent = 'Key …' + rendezvousKey.slice(-6);
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
   function showError(title, msg) {
     errorTitle.textContent = title;
     errorMsg.textContent   = msg;
     errorBanner.style.display = 'block';
   }
-
   function setStatus(icon, text, sub) {
     statusIcon.textContent = icon;
     statusText.textContent = text;
     statusSub.textContent  = sub || '';
   }
+  function hasTorch(track) {
+    if (!track || !track.getCapabilities) return false;
+    return 'torch' in (track.getCapabilities() || {});
+  }
+  function deviceIdFromTrack(track) {
+    try { return ((track && track.getSettings ? track.getSettings() : {}).deviceId) || null; }
+    catch (_) { return null; }
+  }
 
-  // ── Supabase init ──────────────────────────────────────────────────────────
-  // Anon key is safe to embed in browser code (insert-only RLS).
+  // ── Camera selector ───────────────────────────────────────────────────────
+  function syncFace() {
+    var opt = cameraSelect.options[cameraSelect.selectedIndex];
+    cameraFace.textContent = (opt && opt.textContent) ? opt.textContent : 'Default rear camera';
+  }
+
+  async function populateCameras(selectedId, inputs, tIds) {
+    cameraSelect.innerHTML = '';
+    var def = document.createElement('option');
+    def.value = ''; def.textContent = 'Default rear camera';
+    cameraSelect.appendChild(def);
+    var n = 1;
+    for (var i = 0; i < inputs.length; i++) {
+      var d = inputs[i];
+      var o = document.createElement('option');
+      o.value = d.deviceId;
+      var lbl = d.label || ('Camera ' + n++);
+      o.textContent = tIds.has(d.deviceId) ? lbl + ' 🔦' : lbl;
+      cameraSelect.appendChild(o);
+    }
+    var target = selectedId || '';
+    var found = Array.from(cameraSelect.options).some(function(o) { return o.value === target; });
+    cameraSelect.value = found ? target : '';
+    syncFace();
+  }
+
+  async function probeTorchIds(inputs) {
+    var ids = new Set();
+    if (IS_IOS) {
+      // On iOS don't probe — just check the active track
+      if (videoTrack && hasTorch(videoTrack)) { var aid = deviceIdFromTrack(videoTrack); if (aid) ids.add(aid); }
+      return ids;
+    }
+    for (var i = 0; i < inputs.length; i++) {
+      var ps = null;
+      try {
+        ps = await openStreamForDevice(inputs[i].deviceId);
+        var t = ps.getVideoTracks()[0] || null;
+        if (hasTorch(t)) ids.add(inputs[i].deviceId);
+      } catch (_) {
+      } finally { if (ps) ps.getTracks().forEach(function(t) { t.stop(); }); }
+    }
+    return ids;
+  }
+
+  async function openStreamForDevice(deviceId) {
+    var vc = { width: { ideal: 320, min: 160, max: 640 }, height: { ideal: 240, min: 120, max: 480 }, aspectRatio: { ideal: 4/3 }, frameRate: { ideal: 12, max: 15 } };
+    if (deviceId) vc.deviceId = { exact: deviceId }; else vc.facingMode = { ideal: 'environment' };
+    return navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
+  }
+
+  async function openCamera(deviceId) {
+    if (currentStream) { currentStream.getTracks().forEach(function(t) { t.stop(); }); currentStream = null; videoTrack = null; }
+    var stream = await openStreamForDevice(deviceId);
+    currentStream = stream;
+    videoTrack    = stream.getVideoTracks()[0] || null;
+    video.srcObject = stream;
+    await video.play();
+    previewOverlay.classList.add('hidden');
+    // Torch button visibility
+    if (hasTorch(videoTrack)) {
+      torchBtn.style.display = '';
+    } else {
+      torchBtn.style.display = 'none'; torchEnabled = false;
+    }
+    refreshTorchBtn();
+    currentDeviceId = deviceId;
+  }
+
+  // ── Torch ─────────────────────────────────────────────────────────────────
+  function refreshTorchBtn() {
+    if (torchEnabled) { torchBtn.textContent = '🔦 Torch ON'; torchBtn.classList.add('on'); }
+    else              { torchBtn.textContent = '🔦 Torch';     torchBtn.classList.remove('on'); }
+  }
+
+  torchBtn.addEventListener('click', async function () {
+    if (!videoTrack) return;
+    torchBtn.disabled = true;
+    var target = !torchEnabled;
+    try {
+      await videoTrack.applyConstraints({ advanced: [{ torch: target }] });
+      var s = videoTrack.getSettings ? videoTrack.getSettings() : {};
+      if (Object.prototype.hasOwnProperty.call(s, 'torch') && s.torch !== target)
+        throw new Error('camera did not confirm torch state');
+      torchEnabled = target;
+    } catch (err) { console.warn('torch toggle failed:', err); }
+    refreshTorchBtn();
+    torchBtn.disabled = false;
+  });
+
+  // ── Camera selector change ────────────────────────────────────────────────
+  cameraSelect.addEventListener('change', async function () {
+    syncFace();
+    if (!cameraStarted) return;
+    var newId = cameraSelect.value || null;
+    torchEnabled = false; refreshTorchBtn();
+    try { await openCamera(newId); }
+    catch (err) { showError('Camera switch failed', err.message || String(err)); }
+  });
+
+  // ── Supabase ──────────────────────────────────────────────────────────────
   var SUPABASE_URL      = 'https://kkcgxhjsnhhwnmbtfwai.supabase.co';
   var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrY2d4aGpzbmhod25tYnRmd2FpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTM3NjIsImV4cCI6MjA5MzE2OTc2Mn0.s-xTOZxkBAJx1VMS1-l0JJjg-hx901iYa2wkT5M05m0';
 
   function initSupabase() {
     try {
-      var sb = window.supabase || (window.supabaseJs ? window.supabaseJs : null);
+      var sb = window.supabase || (window.supabaseJs || null);
       if (sb && sb.createClient) {
         supabase = sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Subscribe to Companion heartbeat / shutdown broadcasts
+        broadcastChannel = supabase
+          .channel('cloud:' + rendezvousKey)
+          .on('broadcast', { event: 'heartbeat' }, function () {
+            lastHeartbeatTs = Date.now();
+            // Clear zombie overlay if it was showing
+            var zEl = document.getElementById('zombie-overlay');
+            if (zEl) zEl.remove();
+          })
+          .on('broadcast', { event: 'shutdown' }, function () {
+            _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Rescan the QR code to reconnect.');
+          })
+          .subscribe();
+        // Zombie watchdog: if no heartbeat for 90s after camera started, warn
+        heartbeatWatchId = setInterval(function () {
+          if (!cameraStarted || lastHeartbeatTs === 0) return;
+          if (Date.now() - lastHeartbeatTs > 90000) {
+            _showZombieOverlay('Companion not responding', 'No heartbeat received for 90s. The RollShare app may have closed.');
+          }
+        }, 15000);
         return true;
       }
-    } catch (e) {}
+    } catch (_) {}
     return false;
   }
 
-  // ── Canvas helpers ─────────────────────────────────────────────────────────
-  function ensureCanvases() {
-    if (!sfCanvas) {
-      sfCanvas  = document.createElement('canvas');
-      sfCanvas.width  = 160;
-      sfCanvas.height = 120;
-    }
-    if (!capCanvas) {
-      capCanvas = document.createElement('canvas');
-      capCanvas.width  = 320;
-      capCanvas.height = 240;
-    }
+  function _showZombieOverlay(title, msg) {
+    if (document.getElementById('zombie-overlay')) return;
+    var d = document.createElement('div');
+    d.id = 'zombie-overlay';
+    d.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,26,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.7rem;z-index:999;color:#f5b7b1;text-align:center;padding:1.5rem;';
+    d.innerHTML = '<div style="font-size:2.5rem">\u26a0\ufe0f</div><div style="font-weight:700;font-size:1.1rem">' + title + '</div><div style="font-size:0.88rem;color:#ccc">' + msg + '</div>';
+    document.body.appendChild(d);
   }
 
-  // ── Frame processing ───────────────────────────────────────────────────────
+  // ── Canvases ──────────────────────────────────────────────────────────────
+  function ensureCanvases() {
+    if (!sfCanvas)  { sfCanvas  = document.createElement('canvas'); sfCanvas.width  = 160; sfCanvas.height = 120; }
+    if (!capCanvas) { capCanvas = document.createElement('canvas'); capCanvas.width = 320; capCanvas.height = 240; }
+  }
+
+  // ── Frame loop (12 fps) ───────────────────────────────────────────────────
   function processFrame() {
     if (video.readyState < 2) return;
     frameSeq++;
-
     var sfCtx = sfCanvas.getContext('2d', { willReadFrequently: true });
     sfCtx.drawImage(video, 0, 0, 160, 120);
     var imgData = sfCtx.getImageData(0, 0, 160, 120);
-
-    // Grayscale: 0.299r + 0.587g + 0.114b
     var gray = new Uint8Array(160 * 120);
     for (var i = 0; i < gray.length; i++) {
       var p = i * 4;
-      gray[i] = (0.299 * imgData.data[p] + 0.587 * imgData.data[p + 1] + 0.114 * imgData.data[p + 2]) | 0;
+      gray[i] = (0.299 * imgData.data[p] + 0.587 * imgData.data[p+1] + 0.114 * imgData.data[p+2]) | 0;
     }
-
-    var result = motionDetector.update(gray);
-
-    if (result.inMotion) {
-      lastMotionFrame = frameSeq;
-      settleFired = false;
+    var r = motionDetector.update(gray);
+    if (r.inMotion) {
+      lastMotionFrame = frameSeq; settleFired = false;
+      motionDot.classList.add('active');
       setStatus('🎲', 'Motion detected…', 'Keep rolling!');
     } else {
-      var quietFrames = frameSeq - lastMotionFrame;
-      if (!settleFired && quietFrames >= JUST_SETTLED_DELAY_FRAMES) {
+      motionDot.classList.remove('active');
+      var quiet = frameSeq - lastMotionFrame;
+      if (!settleFired && quiet >= JUST_SETTLED_DELAY_FRAMES) {
         settleFired = true;
         var peak = motionDetector.peakBeforeSettle(JUST_SETTLED_DELAY_FRAMES, GRAB_SPIKE_WINDOW);
-        if (peak > GRAB_THRESHOLD && !uploading) {
-          uploadSettledFrame(peak, frameSeq);
-        }
+        if (peak > GRAB_THRESHOLD && !uploading) { uploadSettledFrame(peak, frameSeq); }
+        else if (!uploading) { setStatus('👀', 'Watching for motion…', 'Point camera at the dice tray'); }
       }
     }
   }
 
-  // ── Upload on settle ───────────────────────────────────────────────────────
+  // ── Upload on settle ──────────────────────────────────────────────────────
   async function uploadSettledFrame(peakBeforeSettle, seq) {
     if (!supabase) return;
     uploading = true;
     setStatus('☁️', 'Settled — uploading…', 'Sending frame to RollShare');
-    uploadWrap.style.display = '';
-    uploadBar.style.width = '30%';
-
+    uploadWrap.style.display = ''; uploadBar.style.width = '30%';
     try {
       var capCtx = capCanvas.getContext('2d');
       capCtx.drawImage(video, 0, 0, 320, 240);
-
-      var blob = await new Promise(function (resolve) {
-        capCanvas.toBlob(resolve, 'image/png');
-      });
+      var blob = await new Promise(function(res) { capCanvas.toBlob(res, 'image/png'); });
       if (!blob) throw new Error('toBlob returned null');
-
-      var arrayBuf = await blob.arrayBuffer();
-      var storagePath = sessionId + '/' + String(seq).padStart(6, '0') + '.png';
-
+      var buf  = await blob.arrayBuffer();
+      var path = rendezvousKey + '/' + String(seq).padStart(6, '0') + '.png';
       uploadBar.style.width = '55%';
-
-      // Upload to Storage (anon; RLS allows insert into settled-frames bucket)
-      var upResult = await supabase.storage
-        .from('settled-frames')
-        .upload(storagePath, arrayBuf, { contentType: 'image/png', upsert: true });
-
-      if (upResult.error) {
-        console.error('Storage upload failed', upResult.error);
-        setStatus('⚠️', 'Upload failed', upResult.error.message || 'Storage error');
-        uploadWrap.style.display = 'none';
-        uploading = false;
-        return;
-      }
-
+      var up = await supabase.storage.from('settled-frames').upload(path, buf, { contentType: 'image/png', upsert: true });
+      if (up.error) { setStatus('⚠️', 'Upload failed', up.error.message || 'Storage error'); uploadWrap.style.display = 'none'; uploading = false; return; }
       uploadBar.style.width = '80%';
-
-      // Insert row → triggers Realtime notification to Companion
-      var insResult = await supabase
-        .from('settled_frames')
-        .insert({
-          session_id:         sessionId,
-          storage_path:       storagePath,
-          peak_before_settle: peakBeforeSettle,
-          frame_seq:          seq,
-        });
-
-      if (insResult.error) {
-        console.error('DB insert failed', insResult.error);
-        setStatus('⚠️', 'Upload failed', insResult.error.message || 'DB error');
-        uploadWrap.style.display = 'none';
-        uploading = false;
-        return;
-      }
-
+      // Signal the Companion via Broadcast — no DB write needed
+      await broadcastChannel.send({
+        type: 'broadcast',
+        event: 'frame',
+        payload: { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq },
+      });
       uploadBar.style.width = '100%';
-      setStatus('✅', 'Connected to RollShare ✓', 'Waiting for next roll…');
-      if (!isDev) {
-        try { posthog.capture('cloud_frame_uploaded', { session_short: sessionId.slice(-6) }); } catch(e) {}
-      }
+      setStatus('✅', 'Sent to RollShare ✓', 'Watching for next roll…');
+      if (!isDev) { try { posthog.capture('cloud_frame_uploaded', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
       setTimeout(function () { uploadBar.style.width = '0%'; uploadWrap.style.display = 'none'; }, 600);
-
-    } catch (err) {
-      console.error('uploadSettledFrame error', err);
-      setStatus('⚠️', 'Upload error', String(err));
-      uploadWrap.style.display = 'none';
-    }
-
+    } catch (err) { setStatus('⚠️', 'Upload error', String(err)); uploadWrap.style.display = 'none'; }
     uploading = false;
   }
 
-  // ── Start camera + loop ────────────────────────────────────────────────────
+  // ── Start button ──────────────────────────────────────────────────────────
   startBtn.addEventListener('click', async function () {
-    startBtn.disabled = true;
-    startBtn.textContent = 'Starting…';
+    if (cameraStarted) return;
+    startBtn.disabled = true; startBtn.textContent = 'Starting…';
     setStatus('⏳', 'Requesting camera…', 'Allow camera access when prompted');
 
     if (!initSupabase()) {
       showError('Supabase unavailable', 'Could not load the Supabase library. Check your internet connection and reload.');
-      startBtn.disabled = false;
-      startBtn.textContent = 'Try again';
-      return;
+      startBtn.disabled = false; startBtn.textContent = 'Start camera'; return;
     }
 
-    try {
-      var stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 320 }, height: { ideal: 240 } },
-        audio: false,
-      });
-      video.srcObject = stream;
-      await video.play();
-    } catch (err) {
-      showError('Camera permission denied', 'Please allow camera access and try again. Error: ' + err.message);
-      startBtn.disabled = false;
-      startBtn.textContent = 'Try again';
-      setStatus('📷', 'Camera not available', 'Grant camera permission above');
-      return;
+    var chosenId = cameraSelect.value || null;
+    try { await openCamera(chosenId); }
+    catch (err) {
+      showError('Camera access denied', 'Please allow camera access and try again. ' + (err.message || err));
+      startBtn.disabled = false; startBtn.textContent = 'Start camera';
+      setStatus('📷', 'Camera not available', 'Grant camera permission above'); return;
     }
+
+    // Enumerate cameras now that we have permission to see labels
+    try {
+      var devs = await navigator.mediaDevices.enumerateDevices();
+      var vids  = devs.filter(function(d) { return d.kind === 'videoinput'; });
+      torchIds = await probeTorchIds(vids);
+      // Re-enumerate: browsers reveal real labels + deviceIds after first getUserMedia
+      var fresh = await navigator.mediaDevices.enumerateDevices();
+      var fvids  = fresh.filter(function(d) { return d.kind === 'videoinput'; });
+      // iOS preference: pick rear, non-Wide camera as default
+      if (IS_IOS && !chosenId) {
+        var pref = fvids.find(function(d) {
+          var lbl = (d.label || '').toLowerCase();
+          return lbl && (lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment')) && !lbl.includes('wide');
+        });
+        if (pref && pref.deviceId) { chosenId = pref.deviceId; try { await openCamera(chosenId); } catch(_) {} }
+      }
+      var activeId = deviceIdFromTrack(videoTrack) || chosenId || '';
+      await populateCameras(activeId, fvids, torchIds);
+    } catch (e) { console.warn('camera enumeration failed:', e); }
 
     ensureCanvases();
     motionDetector.reset();
-    setStatus('👀', 'Watching for motion…', 'Point your camera at the dice tray');
+    cameraStarted = true;
     startBtn.textContent = 'Running…';
-
-    // 12 fps capture loop
+    setStatus('👀', 'Watching for motion…', 'Point camera at the dice tray');
     frameTimerId = setInterval(processFrame, Math.round(1000 / 12));
 
-    if (!isDev) {
-      try { posthog.capture('cloud_session_started', { session_short: sessionId.slice(-6) }); } catch(e) {}
-    }
+    if (!isDev) { try { posthog.capture('cloud_session_started', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
   });
 
 })();
