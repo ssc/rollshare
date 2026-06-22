@@ -368,9 +368,13 @@
     video.srcObject = stream;
     await video.play();
     previewOverlay.classList.add('hidden');
-    // Torch button visibility
+    // Torch button + auto-enable
     if (hasTorch(videoTrack)) {
       torchBtn.style.display = '';
+      try {
+        await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
+        torchEnabled = true;
+      } catch (_) { torchEnabled = false; }
     } else {
       torchBtn.style.display = 'none'; torchEnabled = false;
     }
@@ -458,13 +462,28 @@
     if (!sfCanvas)  { sfCanvas  = document.createElement('canvas'); sfCanvas.width  = 160; sfCanvas.height = 120; }
     if (!capCanvas) { capCanvas = document.createElement('canvas'); capCanvas.width = 320; capCanvas.height = 240; }
   }
-
+  /**
+   * Draw video into ctx applying object-fit:cover + object-position:50% 0.
+   * This mirrors the phoneui.html CSS crop: full-width, top of frame, no distortion.
+   * The raw video may be portrait (9:16) from the phone; we take the top 4:3 slice.
+   */
+  function drawCoverTop(ctx, vid, dw, dh) {
+    var vw = vid.videoWidth, vh = vid.videoHeight;
+    if (!vw || !vh) return;
+    // Scale so the destination is fully covered
+    var scale = Math.max(dw / vw, dh / vh);
+    var sw = Math.round(dw / scale);   // source width to sample
+    var sh = Math.round(dh / scale);   // source height to sample
+    var sx = Math.round((vw - sw) / 2); // center horizontally
+    var sy = 0;                          // top (object-position: 50% 0)
+    ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, dw, dh);
+  }
   // ── Frame loop (12 fps) ───────────────────────────────────────────────────
   function processFrame() {
     if (video.readyState < 2) return;
     frameSeq++;
     var sfCtx = sfCanvas.getContext('2d', { willReadFrequently: true });
-    sfCtx.drawImage(video, 0, 0, 160, 120);
+    drawCoverTop(sfCtx, video, 160, 120);
     var imgData = sfCtx.getImageData(0, 0, 160, 120);
     var gray = new Uint8Array(160 * 120);
     for (var i = 0; i < gray.length; i++) {
@@ -496,7 +515,7 @@
     uploadWrap.style.display = ''; uploadBar.style.width = '30%';
     try {
       var capCtx = capCanvas.getContext('2d');
-      capCtx.drawImage(video, 0, 0, 320, 240);
+      drawCoverTop(capCtx, video, 320, 240);
       var blob = await new Promise(function(res) { capCanvas.toBlob(res, 'image/png'); });
       if (!blob) throw new Error('toBlob returned null');
       var buf  = await blob.arrayBuffer();
