@@ -142,6 +142,17 @@
     #upload-bar { height: 100%; width: 0%; background: #16a34a; border-radius: 2px; transition: width 0.2s; }
 
     footer { margin-top: auto; padding-top: 0.85rem; font-size: 0.68rem; color: #2a2a3a; text-align: center; }
+
+    /* debug log panel */
+    #dbg-panel {
+      display: none; margin-top: 0.5rem; width: 100%; max-width: 460px;
+      background: #0a0f0a; border: 1px solid #1a3020; border-radius: 6px;
+      padding: 0.4rem 0.5rem; box-sizing: border-box;
+      max-height: 220px; overflow-y: auto; font-family: monospace; font-size: 0.68rem; color: #4ade80;
+    }
+    #dbg-panel.visible { display: block; }
+    .dbg-err { color: #f87171; }
+    .dbg-warn { color: #fbbf24; }
   </style>
 </head>
 <body>
@@ -189,6 +200,8 @@
 </div>
 
 <div id="upload-bar-wrap"><div id="upload-bar"></div></div>
+
+<div id="dbg-panel" aria-label="Debug log"></div>
 
 <footer>Cloud path · frames uploaded on settle only · video never stored permanently</footer>
 
@@ -423,18 +436,23 @@
       if (sb && sb.createClient) {
         supabase = sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         // Subscribe to Companion heartbeat / shutdown broadcasts
+        dbg('subscribing to broadcast channel cloud:' + rendezvousKey.slice(-6));
         broadcastChannel = supabase
           .channel('cloud:' + rendezvousKey)
           .on('broadcast', { event: 'heartbeat' }, function () {
             lastHeartbeatTs = Date.now();
+            dbg('heartbeat rx');
             // Clear zombie overlay if it was showing
             var zEl = document.getElementById('zombie-overlay');
             if (zEl) zEl.remove();
           })
           .on('broadcast', { event: 'shutdown' }, function () {
+            dbg('shutdown rx', 'warn');
             _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Rescan the QR code to reconnect.');
           })
-          .subscribe();
+          .subscribe(function (status) {
+            dbg('broadcast channel status: ' + status);
+          });
         // Zombie watchdog: if no heartbeat for 90s after camera started, warn
         heartbeatWatchId = setInterval(function () {
           if (!cameraStarted || lastHeartbeatTs === 0) return;
@@ -513,39 +531,69 @@
     }
   }
 
+  // ── Debug log panel ────────────────────────────────────────────────────────
+  var dbgPanel = document.getElementById('dbg-panel');
+  var debugMode = /[?&]debug/.test(window.location.search);
+  if (debugMode) dbgPanel.classList.add('visible');
+  function dbg(msg, level) {
+    var ts = new Date().toISOString().slice(11, 23);
+    var line = ts + ' ' + msg;
+    var cls = level === 'error' ? 'dbg-err' : level === 'warn' ? 'dbg-warn' : '';
+    console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log']('[cloud] ' + msg);
+    if (debugMode) {
+      var el = document.createElement('div');
+      if (cls) el.className = cls;
+      el.textContent = line;
+      dbgPanel.appendChild(el);
+      // keep scrolled to bottom, cap at 200 entries
+      if (dbgPanel.children.length > 200) dbgPanel.removeChild(dbgPanel.firstChild);
+      dbgPanel.scrollTop = dbgPanel.scrollHeight;
+    }
+  }
+
   // ── Upload on settle ──────────────────────────────────────────────────────
   async function uploadSettledFrame(peakBeforeSettle, seq) {
     if (!supabase) return;
     uploading = true;
     setStatus('☁️', 'Settled — uploading…', 'Sending frame to RollShare');
     uploadWrap.style.display = ''; uploadBar.style.width = '30%';
+    dbg('uploadSettledFrame seq=' + seq + ' peak=' + peakBeforeSettle.toFixed(1));
     try {
       var capCtx = capCanvas.getContext('2d');
       drawCoverTop(capCtx, video, 320, 240);
+      dbg('drawCoverTop done, calling toBlob');
       var blob = await new Promise(function(res) { capCanvas.toBlob(res, 'image/png'); });
       if (!blob) throw new Error('toBlob returned null');
+      dbg('blob size=' + blob.size);
       var buf  = await blob.arrayBuffer();
       var path = rendezvousKey + '/' + String(seq).padStart(6, '0') + '.png';
       uploadBar.style.width = '55%';
+      dbg('uploading to storage path=' + path);
       var up = await supabase.storage.from('settled-frames').upload(path, buf, { contentType: 'image/png', upsert: true });
       if (up.error) {
         var errDetail = up.error.message || up.error.error || JSON.stringify(up.error);
+        dbg('upload error: ' + errDetail + ' | status=' + (up.error.statusCode || up.error.status || '?') + ' | full=' + JSON.stringify(up.error), 'error');
         setStatus('\u26a0\ufe0f', 'Upload failed', errDetail);
         console.error('storage upload error:', up.error);
         uploadWrap.style.display = 'none'; uploading = false; return;
       }
+      dbg('upload ok, sending broadcast frame event');
       uploadBar.style.width = '80%';
       // Signal the Companion via Broadcast — no DB write needed
-      await broadcastChannel.send({
+      var bcResult = await broadcastChannel.send({
         type: 'broadcast',
         event: 'frame',
         payload: { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq },
       });
+      dbg('broadcast send result=' + JSON.stringify(bcResult));
       uploadBar.style.width = '100%';
       setStatus('✅', 'Sent to RollShare ✓', 'Watching for next roll…');
       if (!isDev) { try { posthog.capture('cloud_frame_uploaded', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
       setTimeout(function () { uploadBar.style.width = '0%'; uploadWrap.style.display = 'none'; }, 600);
-    } catch (err) { setStatus('⚠️', 'Upload error', String(err)); uploadWrap.style.display = 'none'; }
+    } catch (err) {
+      dbg('upload exception: ' + String(err), 'error');
+      setStatus('⚠️', 'Upload error', String(err)); uploadWrap.style.display = 'none';
+    }
     uploading = false;
   }
 
