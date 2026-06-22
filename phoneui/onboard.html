@@ -466,7 +466,20 @@
                         port = parts[2] || "";
                         uuid = parts[3] || "";
                         // dev flag already decoded in <head> into window._rollshare_dev
-                    } else if (maybeSchema > 2) {
+                    } else if (maybeSchema === 3) {
+                        // Schema 3: 3|session_id[|dev]
+                        // Cloud path — redirect to phoneui-cloud.html on GitHub Pages.
+                        var _sid = parts[1] || '';
+                        var _dev3 = parts[2] === '1';
+                        if (_sid) {
+                            var _dest = 'https://ssc.github.io/rollshare/phoneui/phoneui-cloud.html'
+                                        + '?s=' + encodeURIComponent(_sid)
+                                        + (_dev3 ? '&dev=1' : '');
+                            window.location.replace(_dest);
+                        } else {
+                            schemaError = true;
+                        }
+                    } else if (maybeSchema > 3) {
                         schemaError = true;  // newer format, can't decode safely
                     } else {
                         // schema == 1
@@ -537,6 +550,9 @@
             var lanUrl = "https://" + ip + ":" + port + "/?onboarding=1";
             connectBtn.href = lanUrl;
             urlHint.textContent = lanUrl;
+            connectBtn.addEventListener("click", function () {
+                if (!window._rollshare_dev) posthog.capture('onboard_connect_tapped', { user_id: uuid || null });
+            });
         }
 
         // ── Lightbox ────────────────────────────────────────────────────────────

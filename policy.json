@@ -38,5 +38,8 @@
     "browser_frame_png": false,
     "background_frame_png": false,
     "background_frame_sf_png": false
+  },
+  "features": {
+    "corrupt_stream_recovery": true
   }
 }

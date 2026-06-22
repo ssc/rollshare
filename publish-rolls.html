@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Publish Rolls — RollShare</title>
+  <link rel="icon" href="assets/favicon.ico" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <script src="assets/ph-site.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #12122a;
+      --fg: #dcdce6;
+      --panel: #1a1a36;
+      --border: #2d2d50;
+      --muted: #7878a0;
+      --arcane: #5b7fff;
+    }
+    body {
+      font-family: "Inter", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      text-decoration: none;
+      color: var(--fg);
+    }
+    .logo-icon { display: flex; align-items: center; flex-shrink: 0; margin-right: -1px; }
+    .logo-icon svg { height: 3.25rem; width: 3.25rem; }
+    .logo-name {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+    }
+    .logo-subtitle {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+    }
+    nav { display: flex; align-items: center; gap: 1.5rem; }
+    nav a {
+      font-size: 0.875rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    nav a:hover { color: var(--fg); }
+    @media (max-width: 640px) {
+      header { flex-wrap: wrap; justify-content: center; gap: 0.75rem 1.5rem; padding: 1rem 1.25rem; }
+      .logo { width: 100%; justify-content: center; }
+      nav { width: 100%; justify-content: center; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+    }
+    main {
+      flex: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+      width: 100%;
+    }
+    .hero {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      margin-bottom: 1.5rem;
+    }
+    .hero svg { color: var(--arcane); flex-shrink: 0; }
+    h1 { font-size: 2rem; font-weight: 700; color: #fff; }
+    .subtitle {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .section-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin: 2.5rem 0 0.85rem;
+      font-weight: 600;
+    }
+    .tip-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.3rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .tip-icon {
+      font-size: 1.4rem;
+      flex-shrink: 0;
+      line-height: 1;
+      margin-top: 0.05rem;
+    }
+    .tip-body {}
+    .tip-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 0.3rem;
+    }
+    .tip-desc {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+    .tip-desc strong { color: var(--fg); }
+    .tip-desc a { color: var(--arcane); }
+    .tip-card.highlight {
+      border-color: #3a5ce8;
+      background: #1a1a3e;
+    }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      background: var(--arcane);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .bottom-links {
+      margin-top: 2.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .bottom-links a {
+      font-size: 0.85rem;
+      color: var(--arcane);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.9rem;
+      background: var(--panel);
+      transition: border-color 0.15s;
+    }
+    .bottom-links a:hover { border-color: var(--arcane); }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1rem 2rem;
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--fg); }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="5.1,10 12,14 12,22 5.1,18" fill="#8c8c9b" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <polygon points="12,14 18.9,10 18.9,18 12,22" fill="#b9b9c8" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <polygon points="12,6 18.9,10 12,14 5.1,10" fill="#e4e4f0" stroke="#0f0f23" stroke-width="0.4" stroke-linejoin="round"/>
+        <ellipse cx="12" cy="10" rx="0.75" ry="0.52" fill="#191937"/>
+        <ellipse cx="6.83" cy="13" rx="0.62" ry="0.44" transform="rotate(30 6.83 13)" fill="#191937"/>
+        <ellipse cx="8.55" cy="16" rx="0.62" ry="0.44" transform="rotate(30 8.55 16)" fill="#191937"/>
+        <ellipse cx="10.28" cy="19" rx="0.62" ry="0.44" transform="rotate(30 10.28 19)" fill="#191937"/>
+        <ellipse cx="13.38" cy="14.8" rx="0.62" ry="0.44" transform="rotate(-30 13.38 14.8)" fill="#191937"/>
+        <ellipse cx="17.52" cy="12.4" rx="0.62" ry="0.44" transform="rotate(-30 17.52 12.4)" fill="#191937"/>
+        <ellipse cx="15.45" cy="16" rx="0.62" ry="0.44" transform="rotate(-30 15.45 16)" fill="#191937"/>
+        <ellipse cx="13.38" cy="19.6" rx="0.62" ry="0.44" transform="rotate(-30 13.38 19.6)" fill="#191937"/>
+        <ellipse cx="17.52" cy="17.2" rx="0.62" ry="0.44" transform="rotate(-30 17.52 17.2)" fill="#191937"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-name">ROLL SHARE</div>
+      <div class="logo-subtitle">A better way to play together</div>
+    </div>
+  </a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="download.html">Download</a>
+    <a href="get-started.html">Get Started</a>
+  </nav>
+</header>
+
+<main>
+  <div class="hero">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 2L11 13"/>
+      <path d="M22 2L15 22 11 13 2 9l20-7z"/>
+    </svg>
+    <div>
+      <h1>Publish Rolls</h1>
+      <p class="subtitle">Share your dice results directly to Roll20 or Discord — automatically.</p>
+    </div>
+  </div>
+
+  <p class="section-title">What it does</p>
+
+  <div class="tip-card highlight">
+    <div class="tip-icon">🎲</div>
+    <div class="tip-body">
+      <div class="tip-title">One click to share your roll result</div>
+      <div class="tip-desc">
+        After launching Roll20 or Discord from the <strong>Publish Rolls</strong> panel, RollShare watches for your next roll
+        and automatically posts the result to the chat — including a link to the captured image.
+        No copy-pasting, no switching windows mid-game.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">How to use it</p>
+
+  <div class="tip-card">
+    <div class="step-num">1</div>
+    <div class="tip-body">
+      <div class="tip-title">Open the Publish Rolls panel</div>
+      <div class="tip-desc">
+        Press <strong>Ctrl+R</strong> or scroll down in the RollShare companion window to the
+        <strong>Publish Rolls</strong> section. If you don't see it, make sure you are signed in as an
+        Early Access user.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="step-num">2</div>
+    <div class="tip-body">
+      <div class="tip-title">Select an app and click Launch</div>
+      <div class="tip-desc">
+        Choose <strong>Roll20</strong> or <strong>Discord</strong> from the dropdown, then click
+        <strong>Launch</strong>. A browser window will open. Navigate to the campaign or server channel
+        where you want to post rolls.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="step-num">3</div>
+    <div class="tip-body">
+      <div class="tip-title">Click "Publish Next Roll…"</div>
+      <div class="tip-desc">
+        Back in the companion panel, click <strong>Publish Next Roll&hellip;</strong>
+        Optionally type a label (e.g. <em>Stealth check</em>) so everyone knows what the roll was for,
+        then click <strong>Next</strong>.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="step-num">4</div>
+    <div class="tip-body">
+      <div class="tip-title">Roll your dice</div>
+      <div class="tip-desc">
+        RollShare will detect your roll automatically. Once detected, it posts the result to chat —
+        either pasting it into the text field (with <strong>Auto-click Send</strong> checked) or
+        leaving it there for you to review first.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Requirements</p>
+
+  <div class="tip-card">
+    <div class="tip-icon">📱</div>
+    <div class="tip-body">
+      <div class="tip-title">Phone must be streaming</div>
+      <div class="tip-desc">
+        Make sure your phone is connected and actively streaming before clicking
+        <strong>Publish Next Roll&hellip;</strong> If it isn't, scan the QR code in the
+        <strong>Phone Stream</strong> panel and tap <strong>Start Streaming</strong>.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">📐</div>
+    <div class="tip-body">
+      <div class="tip-title">Die Size Calibration must be complete</div>
+      <div class="tip-desc">
+        If the calibration wizard is showing, complete it first by throwing a die three times as
+        prompted. Calibration only needs to be done once per phone/camera setup.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">💬</div>
+    <div class="tip-body">
+      <div class="tip-title">Navigate to the chat before arming</div>
+      <div class="tip-desc">
+        For Roll20, open your campaign and make sure the chat panel is visible.
+        For Discord, navigate to the channel you want to post in.
+        RollShare probes for the text input when you click <strong>Publish Next Roll&hellip;</strong> —
+        if it can't find it, a message will tell you what to fix.
+      </div>
+    </div>
+  </div>
+
+  <p class="section-title">Tips</p>
+
+  <div class="tip-card">
+    <div class="tip-icon">🔁</div>
+    <div class="tip-body">
+      <div class="tip-title">Repeat without re-launching</div>
+      <div class="tip-desc">
+        After a roll is published the panel returns to idle — just click
+        <strong>Publish Next Roll&hellip;</strong> again for your next roll.
+        You only need to re-launch if you close the browser window.
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-card">
+    <div class="tip-icon">✏️</div>
+    <div class="tip-body">
+      <div class="tip-title">Use labels to give context</div>
+      <div class="tip-desc">
+        The label field is optional but recommended — it appears alongside the roll result so your
+        party knows what it was for (e.g. <em>Attack roll</em>, <em>Perception check</em>).
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-links">
+    <a href="get-started.html">← Get Started</a>
+    <a href="connect-troubleshoot.html">Connection Troubleshooting</a>
+    <a href="index.html">Home</a>
+  </div>
+</main>
+
+<footer>
+  <a href="tos.html">Terms</a> &nbsp;&middot;&nbsp;
+  <a href="index.html#privacy">Privacy</a> &nbsp;&middot;&nbsp;
+  &copy; 2026 RollShare
+</footer>
+
+</body>
+</html>
