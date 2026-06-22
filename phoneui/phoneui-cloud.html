@@ -436,6 +436,15 @@
       var sb = window.supabase || (window.supabaseJs || null);
       if (sb && sb.createClient) {
         supabase = sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Sign in anonymously so uploads use an authenticated JWT (storage-api
+        // requires non-null auth.uid(); bare anon key has null uid).
+        supabase.auth.signInAnonymously().then(function(res) {
+          if (res.error) {
+            dbg('anon sign-in failed: ' + res.error.message, 'warn');
+          } else {
+            dbg('anon sign-in ok uid=' + (res.data && res.data.user ? res.data.user.id.slice(-6) : '?'));
+          }
+        });
         // Subscribe to Companion heartbeat / shutdown broadcasts
         dbg('subscribing to broadcast channel cloud:' + rendezvousKey.slice(-6));
         broadcastChannel = supabase
