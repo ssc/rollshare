@@ -533,7 +533,7 @@
 
   // ── Debug log panel ────────────────────────────────────────────────────────
   var dbgPanel = document.getElementById('dbg-panel');
-  var debugMode = /[?&]debug/.test(window.location.search);
+  var debugMode = /[?&]debug/.test(window.location.search) || /[?&]dev=1/.test(window.location.search);
   if (debugMode) dbgPanel.classList.add('visible');
   function dbg(msg, level) {
     var ts = new Date().toISOString().slice(11, 23);
