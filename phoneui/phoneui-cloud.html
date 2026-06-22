@@ -452,6 +452,19 @@
           })
           .subscribe(function (status) {
             dbg('broadcast channel status: ' + status);
+            if (status === 'SUBSCRIBED') {
+              // Send hello so Companion can confirm bidirectional comms and log device info
+              broadcastChannel.send({
+                type: 'broadcast', event: 'hello',
+                payload: {
+                  type: 'hello',
+                  ua: navigator.userAgent,
+                  platform: navigator.platform || '',
+                  screen: screen.width + 'x' + screen.height,
+                  ts: Date.now(),
+                },
+              }).catch(function () {});
+            }
           });
         // Zombie watchdog: if no heartbeat for 90s after camera started, warn
         heartbeatWatchId = setInterval(function () {
@@ -535,6 +548,7 @@
   var dbgPanel = document.getElementById('dbg-panel');
   var debugMode = /[?&]debug/.test(window.location.search) || /[?&]dev=1/.test(window.location.search);
   if (debugMode) dbgPanel.classList.add('visible');
+  var _remoteLogSeq = 0;
   function dbg(msg, level) {
     var ts = new Date().toISOString().slice(11, 23);
     var line = ts + ' ' + msg;
@@ -548,6 +562,14 @@
       // keep scrolled to bottom, cap at 200 entries
       if (dbgPanel.children.length > 200) dbgPanel.removeChild(dbgPanel.firstChild);
       dbgPanel.scrollTop = dbgPanel.scrollHeight;
+    }
+    // Forward errors, warns, and (in debugMode) all messages to Companion via broadcast
+    if (broadcastChannel && (level === 'error' || level === 'warn' || debugMode)) {
+      _remoteLogSeq++;
+      broadcastChannel.send({
+        type: 'broadcast', event: 'log',
+        payload: { type: 'log', level: level || 'info', msg: msg, seq: _remoteLogSeq },
+      }).catch(function () {});
     }
   }
 
