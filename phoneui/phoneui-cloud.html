@@ -231,7 +231,7 @@
 
 <div id="dbg-panel" aria-label="Debug log"></div>
 
-<footer>Cloud path · frames uploaded on settle only · video never stored permanently</footer>
+<footer>Cloud path · USE_BROADCAST_INLINE=true (inline PNG) · video never stored permanently</footer>
 </div><!-- #page-rotate-wrapper -->
 
 <script>
@@ -245,6 +245,12 @@
   var JUST_SETTLED_DELAY_FRAMES   = 4;
   var GRAB_SPIKE_WINDOW           = 20;
   var GRAB_THRESHOLD              = 7.0;
+
+  // ── Transport mode ────────────────────────────────────────────────────────
+  // true  → embed PNG as base64 directly in the Broadcast payload (no Storage).
+  //         Eliminates the mobile-upload + desktop-download round-trips (~400-1200ms saved).
+  // false → original path: upload to Supabase Storage, broadcast storage_path.
+  var USE_BROADCAST_INLINE = true;
 
   // iOS Safari only allows one active camera at a time; avoid probing all cameras.
   var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -292,7 +298,7 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '748cbe4';
+  var GIT_COMMIT     = 'bee86e4';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -737,50 +743,88 @@
   // ── Upload on settle ──────────────────────────────────────────────────────
   async function uploadSettledFrame(peakBeforeSettle, seq) {
     if (!supabase) return;
-    if (!anonSignedIn) {
-      dbg('upload skipped — anonymous sign-in not yet complete', 'warn');
-      setStatus('⏳', 'Waiting for auth…', 'Anonymous sign-in pending, will retry next settle');
-      return;
-    }
     uploading = true;
-    setStatus('☁️', 'Settled — uploading…', 'Sending frame to RollShare');
+    setStatus('☁️', 'Settled — sending…', 'Sending frame to RollShare');
     uploadWrap.style.display = ''; uploadBar.style.width = '30%';
-    dbg('uploadSettledFrame seq=' + seq + ' peak=' + peakBeforeSettle.toFixed(1));
+    dbg('uploadSettledFrame seq=' + seq + ' peak=' + peakBeforeSettle.toFixed(1) + ' inline=' + USE_BROADCAST_INLINE);
     try {
       var capCtx = capCanvas.getContext('2d');
       drawCoverTop(capCtx, video, 320, 240);
-      dbg('drawCoverTop done, calling toBlob');
-      var blob = await new Promise(function(res) { capCanvas.toBlob(res, 'image/png'); });
-      if (!blob) throw new Error('toBlob returned null');
-      dbg('blob size=' + blob.size);
-      var buf  = await blob.arrayBuffer();
-      var path = rendezvousKey + '/' + String(seq).padStart(6, '0') + '.png';
-      uploadBar.style.width = '55%';
-      dbg('uploading to storage path=' + path);
-      var up = await supabase.storage.from('settled-frames').upload(path, buf, { contentType: 'image/png', upsert: true });
-      if (up.error) {
-        var errDetail = up.error.message || up.error.error || JSON.stringify(up.error);
-        dbg('upload error: ' + errDetail + ' | status=' + (up.error.statusCode || up.error.status || '?') + ' | full=' + JSON.stringify(up.error), 'error');
-        setStatus('\u26a0\ufe0f', 'Upload failed', errDetail);
-        console.error('storage upload error:', up.error);
-        uploadWrap.style.display = 'none'; uploading = false; return;
+      dbg('drawCoverTop done');
+
+      if (USE_BROADCAST_INLINE) {
+        // ── Inline path: embed PNG base64 directly in the Broadcast payload ──
+        // No Storage upload/download; eliminates ~400-1200ms of mobile-upload latency.
+        var blob = await new Promise(function(res) { capCanvas.toBlob(res, 'image/png'); });
+        if (!blob) throw new Error('toBlob returned null');
+        dbg('inline blob size=' + blob.size);
+        if (blob.size > 200 * 1024) {
+          dbg('inline blob exceeds 200KB (' + blob.size + '), falling back to storage path', 'warn');
+          // Fall through to storage path below by re-running as storage mode.
+          uploading = false;
+          uploadWrap.style.display = 'none';
+          var _savedFlag = USE_BROADCAST_INLINE;
+          USE_BROADCAST_INLINE = false;
+          await uploadSettledFrame(peakBeforeSettle, seq);
+          USE_BROADCAST_INLINE = _savedFlag;
+          return;
+        }
+        var reader = new FileReader();
+        var b64 = await new Promise(function(res, rej) {
+          reader.onload = function() { res(reader.result.split(',')[1]); };
+          reader.onerror = rej;
+          reader.readAsDataURL(blob);
+        });
+        uploadBar.style.width = '70%';
+        var bcResult = await broadcastChannel.send({
+          type: 'broadcast',
+          event: 'frame',
+          payload: { type: 'frame', image_b64: b64, peak_before_settle: peakBeforeSettle, frame_seq: seq },
+        });
+        dbg('inline broadcast result=' + JSON.stringify(bcResult));
+        uploadBar.style.width = '100%';
+        setStatus('✅', 'Sent to RollShare ✓', 'Watching for next roll…');
+        if (!isDev) { try { posthog.capture('cloud_frame_uploaded', { rendezvous_short: rendezvousKey.slice(-6), inline: true }); } catch(_) {} }
+        setTimeout(function () { uploadBar.style.width = '0%'; uploadWrap.style.display = 'none'; }, 600);
+
+      } else {
+        // ── Storage path (original): upload PNG, broadcast storage_path ────
+        if (!anonSignedIn) {
+          dbg('upload skipped — anonymous sign-in not yet complete', 'warn');
+          setStatus('⏳', 'Waiting for auth…', 'Anonymous sign-in pending, will retry next settle');
+          uploading = false; uploadWrap.style.display = 'none'; return;
+        }
+        var blob2 = await new Promise(function(res) { capCanvas.toBlob(res, 'image/png'); });
+        if (!blob2) throw new Error('toBlob returned null');
+        dbg('storage blob size=' + blob2.size);
+        var buf  = await blob2.arrayBuffer();
+        var path = rendezvousKey + '/' + String(seq).padStart(6, '0') + '.png';
+        uploadBar.style.width = '55%';
+        dbg('uploading to storage path=' + path);
+        var up = await supabase.storage.from('settled-frames').upload(path, buf, { contentType: 'image/png', upsert: true });
+        if (up.error) {
+          var errDetail = up.error.message || up.error.error || JSON.stringify(up.error);
+          dbg('upload error: ' + errDetail + ' | status=' + (up.error.statusCode || up.error.status || '?') + ' | full=' + JSON.stringify(up.error), 'error');
+          setStatus('\u26a0\ufe0f', 'Upload failed', errDetail);
+          console.error('storage upload error:', up.error);
+          uploadWrap.style.display = 'none'; uploading = false; return;
+        }
+        dbg('upload ok, sending broadcast frame event');
+        uploadBar.style.width = '80%';
+        var bcResult2 = await broadcastChannel.send({
+          type: 'broadcast',
+          event: 'frame',
+          payload: { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq },
+        });
+        dbg('storage broadcast result=' + JSON.stringify(bcResult2));
+        uploadBar.style.width = '100%';
+        setStatus('✅', 'Sent to RollShare ✓', 'Watching for next roll…');
+        if (!isDev) { try { posthog.capture('cloud_frame_uploaded', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
+        setTimeout(function () { uploadBar.style.width = '0%'; uploadWrap.style.display = 'none'; }, 600);
       }
-      dbg('upload ok, sending broadcast frame event');
-      uploadBar.style.width = '80%';
-      // Signal the Companion via Broadcast — no DB write needed
-      var bcResult = await broadcastChannel.send({
-        type: 'broadcast',
-        event: 'frame',
-        payload: { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq },
-      });
-      dbg('broadcast send result=' + JSON.stringify(bcResult));
-      uploadBar.style.width = '100%';
-      setStatus('✅', 'Sent to RollShare ✓', 'Watching for next roll…');
-      if (!isDev) { try { posthog.capture('cloud_frame_uploaded', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
-      setTimeout(function () { uploadBar.style.width = '0%'; uploadWrap.style.display = 'none'; }, 600);
     } catch (err) {
       dbg('upload exception: ' + String(err), 'error');
-      setStatus('⚠️', 'Upload error', String(err)); uploadWrap.style.display = 'none';
+      setStatus('⚠️', 'Send error', String(err)); uploadWrap.style.display = 'none';
     }
     uploading = false;
   }
