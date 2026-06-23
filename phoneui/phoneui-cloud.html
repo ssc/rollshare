@@ -55,7 +55,7 @@
       margin-bottom: 0.65rem;
     }
     #cam-video {
-      width: 100%; height: 100%; object-fit: cover; display: block;
+      width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block;
       transform: rotate(180deg); /* phone placed over tray; 180° corrects orientation, matching phoneui.html */
     }
     #preview-overlay {
@@ -153,9 +153,15 @@
     #dbg-panel.visible { display: block; }
     .dbg-err { color: #f87171; }
     .dbg-warn { color: #fbbf24; }
+
+    #page-rotate-wrapper {
+      max-width: 480px; margin: 0 auto; padding: 0 1rem 1rem;
+      transform: rotate(180deg); transform-origin: center center;
+    }
   </style>
 </head>
 <body>
+<div id="page-rotate-wrapper">
 
 <header>
   <h1>RollShare Cloud</h1>
@@ -204,6 +210,7 @@
 <div id="dbg-panel" aria-label="Debug log"></div>
 
 <footer>Cloud path · frames uploaded on settle only · video never stored permanently</footer>
+</div><!-- #page-rotate-wrapper -->
 
 <script>
 (function () {
@@ -255,7 +262,7 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = 'c5e498e';
+  var GIT_COMMIT     = '847eaa8';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
