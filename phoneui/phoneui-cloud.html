@@ -255,7 +255,7 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '00a7089';
+  var GIT_COMMIT     = 'c5e498e';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -303,6 +303,9 @@
     startBtn.disabled = true;
   } else {
     sessionChip.textContent = 'Key …' + rendezvousKey.slice(-6);
+    // Connect to the broadcast channel immediately so Companion sees "Phone connected"
+    // before the user taps Start Streaming.
+    initSupabase();
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -434,6 +437,7 @@
   var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrY2d4aGpzbmhod25tYnRmd2FpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTM3NjIsImV4cCI6MjA5MzE2OTc2Mn0.s-xTOZxkBAJx1VMS1-l0JJjg-hx901iYa2wkT5M05m0';
 
   function initSupabase() {
+    if (supabase) return true;  // already initialized
     try {
       var sb = window.supabase || (window.supabaseJs || null);
       if (sb && sb.createClient) {
@@ -495,8 +499,29 @@
     return false;
   }
 
+  function _releaseCamera() {
+    if (!cameraStarted) return;
+    cameraStarted = false;
+    startBtn.textContent = 'Start camera';
+    startBtn.disabled = false;
+    if (frameTimerId !== null) { clearInterval(frameTimerId); frameTimerId = null; }
+    if (torchEnabled) {
+      torchEnabled = false;
+      torchBtn.textContent = '\uD83D\uDD26';
+      torchBtn.style.display = 'none';
+    }
+    if (currentStream) {
+      currentStream.getTracks().forEach(function(t) { t.stop(); });
+      currentStream = null;
+      videoTrack = null;
+    }
+    video.srcObject = null;
+    dbg('camera released — companion disconnected', 'warn');
+  }
+
   function _showZombieOverlay(title, msg) {
     if (document.getElementById('zombie-overlay')) return;
+    _releaseCamera();
     var d = document.createElement('div');
     d.id = 'zombie-overlay';
     d.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,26,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.7rem;z-index:999;color:#f5b7b1;text-align:center;padding:1.5rem;';
