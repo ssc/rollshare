@@ -244,7 +244,7 @@
   var MOTION_NOISE_EMA_ALPHA      = 0.02;
   var JUST_SETTLED_DELAY_FRAMES   = 4;
   var GRAB_SPIKE_WINDOW           = 20;
-  var GRAB_THRESHOLD              = 7.0;
+  var GRAB_THRESHOLD              = 5.0;
 
   // ── Transport mode ────────────────────────────────────────────────────────
   // true  → embed PNG as base64 directly in the Broadcast payload (no Storage).
@@ -282,7 +282,7 @@
     this.history.push(diffMean);
     this.threshHist.push(this.threshold);
     this.settleHist.push(null);  // filled in by processFrame on settle
-    return { inMotion: diffMean > this.threshold };
+    return { inMotion: diffMean > this.threshold, diff_mean: diffMean };
   };
   MotionDetector.prototype.markSettle = function (peak) {
     if (this.settleHist.length) this.settleHist[this.settleHist.length - 1] = peak;
@@ -298,7 +298,7 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = 'bee86e4';
+  var GIT_COMMIT     = '8f62bdf';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -336,6 +336,7 @@
   var settleFired     = false;
   var uploading       = false;
   var anonSignedIn    = false;   // set true once signInAnonymously() resolves
+  var _grabPreviewSent = false;  // true once display-only preview has been sent for current throw
   var frameTimerId    = null;
   var sfCanvas        = null;
   var capCanvas       = null;
@@ -618,11 +619,18 @@
       lastMotionFrame = frameSeq; settleFired = false;
       motionDot.classList.add('active');
       setStatus('🎲', 'Motion detected…', 'Keep rolling!');
+      // Send a display-only preview frame on the first above-threshold motion frame
+      // of each throw — pure eye candy, Python will not run analysis on it.
+      if (!_grabPreviewSent && r.diff_mean > GRAB_THRESHOLD && !uploading) {
+        _grabPreviewSent = true;
+        sendDisplayFrame(frameSeq);
+      }
     } else {
       motionDot.classList.remove('active');
       var quiet = frameSeq - lastMotionFrame;
       if (!settleFired && quiet >= JUST_SETTLED_DELAY_FRAMES) {
         settleFired = true;
+        _grabPreviewSent = false;  // reset so next throw can send a preview again
         var peak = motionDetector.peakBeforeSettle(JUST_SETTLED_DELAY_FRAMES, GRAB_SPIKE_WINDOW);
         motionDetector.markSettle(peak);
         if (peak > GRAB_THRESHOLD && !uploading) { uploadSettledFrame(peak, frameSeq); }
@@ -737,6 +745,25 @@
         type: 'broadcast', event: 'log',
         payload: { type: 'log', level: level || 'info', msg: msg, seq: _remoteLogSeq },
       }).catch(function () {});
+    }
+  }
+
+  // ── Display-only preview (grab moment eye candy) ────────────────────────────
+  // Fires on the first above-threshold motion frame of a throw. Sends the current
+  // sfCanvas (160×120 JPEG) via Broadcast with display_only:true so Python shows
+  // it in the companion pip but does NOT run dice analysis.
+  function sendDisplayFrame(seq) {
+    if (!broadcastChannel) return;
+    try {
+      var b64 = sfCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      broadcastChannel.send({
+        type: 'broadcast',
+        event: 'frame',
+        payload: { type: 'frame', image_b64: b64, display_only: true, frame_seq: seq },
+      });
+      dbg('display-only preview sent seq=' + seq);
+    } catch (e) {
+      dbg('display-only send failed: ' + e, 'warn');
     }
   }
 
