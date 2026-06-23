@@ -244,7 +244,7 @@
   var MOTION_NOISE_EMA_ALPHA      = 0.02;
   var JUST_SETTLED_DELAY_FRAMES   = 4;
   var GRAB_SPIKE_WINDOW           = 20;
-  var GRAB_THRESHOLD              = 10.0;
+  var GRAB_THRESHOLD              = 7.0;
 
   // iOS Safari only allows one active camera at a time; avoid probing all cameras.
   var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -292,7 +292,7 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '55df77c';
+  var GIT_COMMIT     = '748cbe4';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
