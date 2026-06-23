@@ -262,7 +262,7 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '847eaa8';
+  var GIT_COMMIT     = 'ba13fc4';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -542,11 +542,13 @@
     if (!capCanvas) { capCanvas = document.createElement('canvas'); capCanvas.width = 320; capCanvas.height = 240; }
   }
   /**
-   * Draw video into ctx matching phoneui.html orientation: rotate(180°) display.
-   * The phone is placed over the dice tray so the raw frame is upside-down.
-   * After 180° CSS rotation, visual top = raw bottom of the frame.
-   * We replicate this: sample from the bottom of the raw frame, then rotate
-   * the canvas 180° so the output image is right-side-up for the detector.
+   * Draw video into ctx matching the visible preview: page wrapper rotate(180°) +
+   * video element rotate(180°) cancel each other for display, and object-position:50% 0
+   * anchors the cover-crop to the TOP of the raw frame.
+   *
+   * The raw frame top = the dice tray (phone held face-down overhead).
+   * We sample sy=0 (top of raw frame) and rotate the canvas output 180° so the
+   * detector receives a right-side-up image (same orientation as the visible preview).
    */
   function drawCoverTop(ctx, vid, dw, dh) {
     var vw = vid.videoWidth, vh = vid.videoHeight;
@@ -555,8 +557,8 @@
     var sw = Math.round(dw / scale);
     var sh = Math.round(dh / scale);
     var sx = Math.round((vw - sw) / 2);  // center horizontally
-    var sy = vh - sh;                     // bottom of raw = visual top after 180° rotation
-    // Rotate canvas 180° so detector receives a right-side-up image
+    var sy = 0;                           // top of raw frame = dice tray (matches object-position:50% 0)
+    // Rotate 180° so the output is right-side-up (matches the visible preview orientation)
     ctx.save();
     ctx.translate(dw, dh);
     ctx.rotate(Math.PI);
