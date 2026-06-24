@@ -330,8 +330,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '640e20c';
-  var BUILD_TIME     = '2026-06-24 12:57 UTC';
+  var GIT_COMMIT     = '0d9e8f4';
+  var BUILD_TIME     = '2026-06-24 13:22 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -358,6 +358,7 @@
   var broadcastChannel = null;   // Supabase Realtime broadcast channel
   var lastHeartbeatTs  = 0;      // epoch ms of last Companion heartbeat received
   var heartbeatWatchId = null;   // setInterval id for zombie detection
+  var _hbRxCount       = 0;      // heartbeats received from Companion this session
   var currentStream   = null;
   var videoTrack      = null;
   var torchEnabled    = false;
@@ -417,7 +418,7 @@
     var label = (opt && opt.value) ? (opt.textContent || '').replace(/\s*🔦$/, '').trim() : '';
     if (!label) return;
     broadcastChannel.send({
-      type: 'broadcast', event: 'hello',
+      type: 'broadcast', event: 'broadcast',
       payload: { type: 'cam_label', label: label },
     }).catch(function() {});
   }
@@ -549,7 +550,20 @@
           .channel('cloud:' + rendezvousKey)
           .on('broadcast', { event: 'heartbeat' }, function () {
             lastHeartbeatTs = Date.now();
-            dbg('heartbeat rx');
+            _hbRxCount++;
+            if (broadcastChannel) {
+              var _ackOpt = cameraSelect.options[cameraSelect.selectedIndex];
+              var _ackLabel = (_ackOpt && _ackOpt.value) ? (_ackOpt.textContent || '').replace(/\s*🔦$/, '').trim() : '';
+              broadcastChannel.send({
+                type: 'broadcast', event: 'broadcast',
+                payload: {
+                  type: 'hb_ack',
+                  count: _hbRxCount,
+                  build_time: BUILD_TIME,
+                  cam_label: _ackLabel,
+                },
+              }).catch(function() {});
+            }
             // Clear zombie overlay if it was showing
             var zEl = document.getElementById('zombie-overlay');
             if (zEl) zEl.remove();
@@ -567,6 +581,7 @@
                 payload: {
                   type: 'hello',
                   app_version: APP_VERSION,
+                  build_time: BUILD_TIME,
                   ua: navigator.userAgent,
                   platform: navigator.platform || '',
                   screen: screen.width + 'x' + screen.height,
