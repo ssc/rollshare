@@ -461,9 +461,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '57110b4';
-  var BUILD_TIME     = '2026-06-25 21:31 UTC';
+  var APP_VERSION    = '1.0.90';
+  var GIT_COMMIT     = 'f7ec8cf';
+  var BUILD_TIME     = '2026-06-25 23:49 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -600,8 +600,8 @@
     currentStream = stream;
     videoTrack    = stream.getVideoTracks()[0] || null;
     video.srcObject = stream;
-    await video.play();
     previewOverlay.classList.add('hidden');
+    await video.play();
     // Torch button + auto-enable
     if (RsCameraSelector.hasTorchCapability(videoTrack)) {
       torchBtn.style.display = '';
@@ -1169,7 +1169,7 @@
   // Stamp version into status bar (always, not just when autostart)
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== '1.0.86') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== '1.0.90') v.textContent = 'v' + APP_VERSION;
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');
