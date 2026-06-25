@@ -106,16 +106,27 @@
 
     /* ── Status bar ── */
     #status-bar {
-      width: 100%; max-width: 460px;
-      background: #111c17; border: 1px solid #1f3d2d; border-radius: 10px;
-      padding: 0.55rem 0.9rem;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 9998;
+      background: #111c17; border-top: 1px solid #1f3d2d;
+      padding: 0.45rem 0.9rem 0.5rem;
       display: flex; align-items: center; gap: 0.55rem;
-      margin-bottom: 0.6rem;
     }
     #status-icon { font-size: 1.3rem; flex-shrink: 0; }
     #status-text { font-size: 0.86rem; font-weight: 600; color: #86efac; }
     #status-sub  { font-size: 0.74rem; color: #6b9b7a; margin-top: 0.05rem; }
     #session-chip { font-family: monospace; font-size: 0.66rem; color: #4a8a60; margin-top: 0.1rem; letter-spacing: 0.04em; }
+    #status-version { font-family: monospace; font-size: 0.6rem; color: #2a5a3a; margin-left: auto; flex-shrink: 0; align-self: flex-end; padding-bottom: 0.05rem; }
+    /* tap-to-start overlay — shown on iOS when autostart needs a real gesture */
+    #tap-overlay {
+      display: none; position: fixed; inset: 0; z-index: 19999;
+      background: rgba(5,10,8,0.88);
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 1rem; cursor: pointer;
+    }
+    #tap-overlay.show { display: flex; }
+    #tap-overlay .tap-icon { font-size: 3rem; }
+    #tap-overlay .tap-msg  { font-size: 1.2rem; font-weight: 700; color: #86efac; }
+    #tap-overlay .tap-sub  { font-size: 0.85rem; color: #4a8a60; }
 
     /* ── Controls ── */
     #controls { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 0.45rem; }
@@ -232,6 +243,7 @@
     }
     #cam-content {
       flex: 1; display: flex; flex-direction: column; justify-content: center;
+      padding-bottom: 3.5rem; /* clear fixed #status-bar at bottom */
     }
     #rotate-toggle-btn { position: fixed; bottom: 1rem; left: 1rem; z-index: 10001; width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode floating button — bottom-right, mirrors rotate button */
@@ -347,9 +359,10 @@
   <span id="status-icon">⏳</span>
   <div>
     <div id="status-text">Ready</div>
-    <div id="status-sub">Tap Start Camera to begin</div>
+    <div id="status-sub">Starting camera…</div>
     <div id="session-chip"></div>
   </div>
+  <span id="status-version"></span>
 </div>
 
 <!-- Controls -->
@@ -368,6 +381,13 @@
 </div><!-- #cam-content -->
 
 </div><!-- #page-rotate-wrapper -->
+
+<!-- tap-to-start overlay: shown on iOS when autostart needs a real gesture -->
+<div id="tap-overlay">
+  <span class="tap-icon">📷</span>
+  <span class="tap-msg">Tap anywhere to start</span>
+  <span class="tap-sub">Camera will start immediately</span>
+</div>
 
 <!-- fixed bottom status bar, shown once camera is running -->
 <div id="inline-status"></div>
@@ -450,8 +470,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '9b2cc8e';
-  var BUILD_TIME     = '2026-06-25 18:55 UTC';
+  var GIT_COMMIT     = 'e87607c';
+  var BUILD_TIME     = '2026-06-25 19:04 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -1132,9 +1152,47 @@
     if (!isDev) { try { posthog.capture('cloud_session_started', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
   });
 
-  // Auto-click Start Camera on page load. Pass ?noautostart=1 to suppress (used by automated tests).
+  // ── Auto-start camera on page load ───────────────────────────────────────
+  // On Android/desktop, getUserMedia works without a prior gesture so we can
+  // fire the start immediately.  On iOS Safari it requires a real touch event;
+  // if the instant attempt fails we show a full-screen tap overlay so the
+  // user's first tap (a genuine gesture) triggers the start.
+  // Pass ?noautostart=1 to suppress entirely (used by automated tests).
   if (!params.get('noautostart')) {
-    setTimeout(function () { startBtn.click(); }, 300);
+    // Stamp version into status bar
+    (function() {
+      var v = document.getElementById('status-version');
+      if (v && APP_VERSION && APP_VERSION !== '1.0.86') v.textContent = 'v' + APP_VERSION;
+    })();
+
+    // Try immediate start — works on Android Chrome and desktop
+    var _autoAttempted = false;
+    function _tryAutoStart() {
+      if (_autoAttempted || cameraStarted) return;
+      _autoAttempted = true;
+      // Probe getUserMedia quickly; if it needs a gesture it will throw NotAllowedError
+      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then(function(probe) {
+          // Stop the probe stream — openCamera will open the real one
+          probe.getTracks().forEach(function(t) { t.stop(); });
+          startBtn.click();
+        })
+        .catch(function(err) {
+          // NotAllowedError on iOS means we need a gesture — show tap overlay
+          var tapOverlay = document.getElementById('tap-overlay');
+          if (tapOverlay) tapOverlay.classList.add('show');
+        });
+    }
+
+    var _tapOverlay = document.getElementById('tap-overlay');
+    if (_tapOverlay) {
+      _tapOverlay.addEventListener('click', function() {
+        _tapOverlay.classList.remove('show');
+        startBtn.click();
+      });
+    }
+
+    setTimeout(_tryAutoStart, 400);
   }
 
   // ── Info overlay ──────────────────────────────────────────────────────────
