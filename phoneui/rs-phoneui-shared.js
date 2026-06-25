@@ -144,3 +144,123 @@ window.RsDevGenerators = (function () {
         stopCaptureStream: stopCaptureStream,
     };
 })();
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * RsCameraSelector — shared camera-enumeration and stream helpers.
+ *
+ * Usage (both pages):
+ *   .openStreamForDevice(deviceId)            → Promise<MediaStream>
+ *   .hasTorchCapability(track)                → boolean
+ *   .deviceIdFromTrack(track)                 → string | null
+ *   .probeTorchIds(inputs, IS_IOS, videoTrack) → Promise<Set<string>>
+ *   .populateSelectEl(sel, selectedId, inputs, torchIds) → string (resolved value)
+ *   .getPreferredIosCamera(videoInputs)        → MediaDeviceInfo | null
+ *
+ * Rotation contract (both pages):
+ *   The <video> element always has CSS `transform: rotate(180deg)` to correct for
+ *   the phone held face-down over the dice tray. The page-rotation toggle only
+ *   controls the UI wrapper orientation — it does NOT affect the video transform or
+ *   canvas frame sampling.  Canvas helpers (e.g. drawCoverTop) should always apply
+ *   the same 180° rotation regardless of the rs_page_rotated localStorage value.
+ * ──────────────────────────────────────────────────────────────────────────── */
+window.RsCameraSelector = (function () {
+    'use strict';
+
+    /* Standard video constraints for the dice-camera use case (320×240 @ 12 fps). */
+    function openStreamForDevice(deviceId) {
+        var vc = {
+            width:       { ideal: 320, min: 160, max: 640 },
+            height:      { ideal: 240, min: 120, max: 480 },
+            aspectRatio: { ideal: 4/3 },
+            frameRate:   { ideal: 12, max: 15 },
+        };
+        if (deviceId) vc.deviceId = { exact: deviceId };
+        else          vc.facingMode = { ideal: 'environment' };
+        return navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
+    }
+
+    /* Returns true if the track's capabilities include the 'torch' constraint. */
+    function hasTorchCapability(track) {
+        if (!track || !track.getCapabilities) return false;
+        return 'torch' in (track.getCapabilities() || {});
+    }
+
+    /* Returns the deviceId reported by the track's settings, or null on failure. */
+    function deviceIdFromTrack(track) {
+        try {
+            return ((track && track.getSettings ? track.getSettings() : {}).deviceId) || null;
+        } catch (_) { return null; }
+    }
+
+    /* Probe which devices in `inputs` support torch.
+     * On iOS only the active track is inspected (multi-camera probe ends the preview). */
+    async function probeTorchIds(inputs, IS_IOS, activeTrack) {
+        var ids = new Set();
+        if (IS_IOS) {
+            if (activeTrack && hasTorchCapability(activeTrack)) {
+                var aid = deviceIdFromTrack(activeTrack);
+                if (aid) ids.add(aid);
+            }
+            return ids;
+        }
+        for (var i = 0; i < inputs.length; i++) {
+            var ps = null;
+            try {
+                ps = await openStreamForDevice(inputs[i].deviceId);
+                var t = ps.getVideoTracks()[0] || null;
+                if (hasTorchCapability(t)) ids.add(inputs[i].deviceId);
+            } catch (_) {
+            } finally {
+                if (ps) ps.getTracks().forEach(function (t) { t.stop(); });
+            }
+        }
+        return ids;
+    }
+
+    /* Populate a native <select> element with camera options.
+     * Returns the value that was set on the select ('' = default rear camera). */
+    function populateSelectEl(selectEl, selectedId, inputs, torchIds) {
+        selectEl.innerHTML = '';
+        var def = document.createElement('option');
+        def.value = ''; def.textContent = 'Default rear camera';
+        selectEl.appendChild(def);
+        if (!inputs.length) {
+            var none = document.createElement('option');
+            none.value = ''; none.textContent = 'No camera found';
+            selectEl.appendChild(none);
+        }
+        var n = 1;
+        for (var i = 0; i < inputs.length; i++) {
+            var d = inputs[i];
+            var o = document.createElement('option');
+            o.value = d.deviceId;
+            var lbl = d.label || ('Camera ' + n++);
+            o.textContent = (torchIds && torchIds.has(d.deviceId)) ? lbl + ' \uD83D\uDD26' : lbl;
+            selectEl.appendChild(o);
+        }
+        var target = selectedId || '';
+        var found = Array.from(selectEl.options).some(function (o) { return o.value === target; });
+        selectEl.value = found ? target : '';
+        return selectEl.value;
+    }
+
+    /* iOS: prefer a rear non-Wide camera for a tighter overhead dice-tray view.
+     * Returns the matching MediaDeviceInfo, or null if none found. */
+    function getPreferredIosCamera(videoInputs) {
+        return videoInputs.find(function (d) {
+            var lbl = (d.label || '').toLowerCase();
+            if (!lbl) return false;
+            if (!(lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment'))) return false;
+            return !lbl.includes('wide');
+        }) || null;
+    }
+
+    return {
+        openStreamForDevice:   openStreamForDevice,
+        hasTorchCapability:    hasTorchCapability,
+        deviceIdFromTrack:     deviceIdFromTrack,
+        probeTorchIds:         probeTorchIds,
+        populateSelectEl:      populateSelectEl,
+        getPreferredIosCamera: getPreferredIosCamera,
+    };
+})();

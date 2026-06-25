@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>RollShare — Cloud Camera</title>
+  <title>RollShare — PhoneUI Camera</title>
   <script>
     (function() {
       var _p = new URLSearchParams(window.location.search);
@@ -51,15 +51,18 @@
       font-family: Segoe UI, system-ui, sans-serif;
       background: #0a0a1a;
       color: #e8e8e8;
-      min-height: 100dvh;
+      height: 100dvh;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 0.85rem 0.85rem 1.5rem;
+      padding: 0.85rem 0.85rem 0.85rem;
     }
-    header { margin-bottom: 0.65rem; text-align: center; }
-    header h1 { font-size: 1.3rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
-    header p  { color: #777; font-size: 0.8rem; margin-top: 0.1rem; }
+    header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.65rem; text-align: center; }
+    header .header-title-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
+    header .header-title-row img { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; }
+    header h1 { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 1.1rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin: 0; }
+    header p  { color: #777; font-size: 0.8rem; margin-top: 0.25rem; }
 
     #error-banner {
       display: none;
@@ -77,7 +80,7 @@
       border-radius: 12px; overflow: hidden;
       background: #111;
       aspect-ratio: 4/3;
-      margin-bottom: 0.65rem;
+      margin: 0 auto 0.65rem;
     }
     #cam-video {
       width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block;
@@ -157,6 +160,16 @@
     #start-btn:hover { background: #15803d; }
     #start-btn:active { background: #14532d; }
     #start-btn:disabled { background: #1a3020; color: #3a6040; cursor: default; }
+    /* compact status bar pinned to the bottom of the screen */
+    #inline-status {
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;
+      padding: 0.38rem 1rem 0.45rem;
+      background: #0d1f14; border-top: 1px solid #1f3d2d;
+      font-size: 0.75rem; color: #86efac;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #status-bar.running { display: none; }
 
     /* upload progress */
     #upload-bar-wrap {
@@ -168,21 +181,23 @@
 
     footer { margin-top: auto; padding-top: 0.85rem; font-size: 0.68rem; color: #2a2a3a; text-align: center; }
 
-    /* debug log panel */
+    /* debug log panel — fixed overlay, shown only in debug mode */
     #dbg-panel {
-      display: none; margin-top: 0.5rem; width: 100%; max-width: 460px;
-      background: #0a0f0a; border: 1px solid #1a3020; border-radius: 6px;
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 9000;
+      background: #0a0f0a; border-top: 1px solid #1a3020;
       padding: 0.4rem 0.5rem; box-sizing: border-box;
-      max-height: 120px; overflow-y: auto; font-family: monospace; font-size: 0.68rem; color: #4ade80;
+      max-height: 130px; overflow-y: auto; font-family: monospace; font-size: 0.68rem; color: #4ade80;
     }
     #dbg-panel.visible { display: block; }
     .dbg-err { color: #f87171; }
     .dbg-warn { color: #fbbf24; }
 
-    /* motion diff graph (debug mode) */
+    /* motion diff graph — fixed overlay, shown only in debug mode */
     #motion-graph-wrap {
-      display: none; margin-top: 0.5rem; width: 100%; max-width: 460px;
-      background: #050d07; border: 1px solid #1a3020; border-radius: 6px;
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 8999;
+      background: #050d07; border-top: 1px solid #1a3020;
       padding: 0.35rem 0.5rem 0.4rem; box-sizing: border-box;
     }
     #motion-graph-wrap.visible { display: block; }
@@ -192,10 +207,11 @@
     }
     #motion-graph { display: block; width: 100%; height: 72px; }
 
-    /* canvas preview panel (debug mode) */
+    /* canvas preview panel — fixed overlay, shown only in debug mode */
     #canvas-preview-wrap {
-      display: none; margin-top: 0.5rem; width: 100%; max-width: 460px;
-      background: #050d07; border: 1px solid #1a3020; border-radius: 6px;
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 8998;
+      background: #050d07; border-top: 1px solid #1a3020;
       padding: 0.35rem 0.5rem 0.4rem; box-sizing: border-box;
     }
     #canvas-preview-wrap.visible { display: block; }
@@ -211,9 +227,67 @@
     .cpv-block canvas { display: block; width: 100%; height: auto; border: 1px solid #1a3020; border-radius: 3px; image-rendering: pixelated; }
 
     #page-rotate-wrapper {
-      max-width: 480px; margin: 0 auto; padding: 0 1rem 1rem;
+      max-width: 480px; width: 100%; padding: 0 1rem;
+      display: flex; flex-direction: column; flex: 1;
+    }
+    #cam-content {
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
     }
     #rotate-toggle-btn { position: fixed; bottom: 1rem; left: 1rem; z-index: 10001; width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.15rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    /* devmode floating button — bottom-right, mirrors rotate button */
+    #devmode-toggle-btn { position: fixed; bottom: 1rem; right: 1rem; z-index: 10001; width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 1px solid #f97316; background: rgba(30,20,10,0.85); color: #f97316; font-size: 1.05rem; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    /* devmode overlay panel */
+    #devmode-panel {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10000;
+      background: rgba(10,8,4,0.97); border-top: 1px solid #f97316;
+      padding: 12px; overflow-y: auto;
+      flex-direction: column; gap: 8px;
+      font-family: monospace; box-shadow: 0 -4px 24px rgba(0,0,0,0.7);
+    }
+    #devmode-panel.open { display: flex; }
+
+    /* ── Info overlay ── */
+    #info-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.1rem; height: 1.1rem; border-radius: 50%;
+      border: 1px solid #4a8a60; background: transparent;
+      color: #4a8a60; font-size: 0.65rem; font-weight: 700;
+      cursor: pointer; vertical-align: middle; margin-left: 0.3rem;
+      line-height: 1; padding: 0; flex-shrink: 0;
+    }
+    #info-overlay {
+      display: none; position: fixed; inset: 0; z-index: 20000;
+      background: rgba(0,0,0,0.82);
+      align-items: center; justify-content: center; padding: 1.2rem;
+    }
+    #info-overlay.open { display: flex; }
+    #info-dialog {
+      background: #0d1a12; border: 1px solid #2a4a35; border-radius: 14px;
+      max-width: 340px; width: 100%; overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    }
+    #info-dialog img {
+      width: 100%; display: block;
+      max-height: 50vh; object-fit: cover; object-position: center 30%;
+    }
+    #info-dialog-body {
+      padding: 0.85rem 1rem 1rem;
+      display: flex; flex-direction: column; gap: 0.55rem;
+    }
+    #info-dialog-body p {
+      font-size: 0.82rem; color: #a0c8b0; line-height: 1.45; margin: 0;
+    }
+    #info-dialog-footer {
+      display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+    }
+    #info-dialog-footer a {
+      font-size: 0.78rem; color: #4ade80; text-decoration: underline;
+    }
+    #info-dismiss-btn {
+      padding: 0.38rem 0.85rem;
+      background: #1a3020; border: 1px solid #2a5030; border-radius: 6px;
+      color: #86efac; font-size: 0.78rem; cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -231,10 +305,28 @@
 </script>
 
 <header>
-  <h1>RollShare Cloud</h1>
-  <p>Point your phone down at the dice tray</p>
+  <div class="header-title-row">
+    <img src="../assets/rollshare_logo.png" alt="RollShare" />
+    <h1>RollShare</h1>
+  </div>
+  <p>Point phone down at the dice tray<button id="info-btn" title="How to set up" aria-label="Setup info">i</button></p>
 </header>
 
+<!-- Info overlay -->
+<div id="info-overlay" role="dialog" aria-modal="true" aria-label="Setup info">
+  <div id="info-dialog">
+    <img src="../assets/paper_tray_00.jpg" alt="Phone resting face-down on a soda can over a paper dice tray" />
+    <div id="info-dialog-body">
+      <p>Rest your phone <strong>face-down</strong> on a prop (a soda can works great) so the camera looks straight down at your dice tray.</p>
+      <div id="info-dialog-footer">
+        <a href="https://ssc.github.io/rollshare/get-started.html" target="_blank" rel="noopener">More info ↗</a>
+        <button id="info-dismiss-btn">Got it</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cam-content">
 <div id="error-banner" role="alert">
   <strong id="error-title">Something went wrong</strong>
   <span id="error-msg">Check that the QR code is valid and the Companion App is running.</span>
@@ -255,7 +347,7 @@
   <span id="status-icon">⏳</span>
   <div>
     <div id="status-text">Ready</div>
-    <div id="status-sub">Tap Start camera to begin</div>
+    <div id="status-sub">Tap Start Camera to begin</div>
     <div id="session-chip"></div>
   </div>
 </div>
@@ -268,39 +360,47 @@
   </div>
   <div id="action-row">
     <button id="torch-btn" title="Toggle torch">🔦 Torch</button>
-    <button id="start-btn">Start camera</button>
+    <button id="start-btn">Start Camera</button>
   </div>
 </div>
 
 <div id="upload-bar-wrap"><div id="upload-bar"></div></div>
+</div><!-- #cam-content -->
 
-<div id="motion-graph-wrap" aria-label="Motion graph">
-  <div id="motion-graph-label">
-    <span id="motion-graph-cur">diff —</span>
-    <span id="motion-graph-peak">peak —</span>
-    <span id="motion-graph-thresh">thr —</span>
-  </div>
-  <canvas id="motion-graph" width="440" height="72"></canvas>
-</div>
-
-<div id="canvas-preview-wrap" aria-label="Canvas preview">
-  <div id="canvas-preview-label">Canvas preview (debug)</div>
-  <div id="canvas-preview-row">
-    <div class="cpv-block">
-      <span>sfCanvas 160×120 (motion)</span>
-      <canvas id="cpv-sf" width="160" height="120"></canvas>
-    </div>
-    <div class="cpv-block">
-      <span>capCanvas 320×240 (settle)</span>
-      <canvas id="cpv-cap" width="320" height="240"></canvas>
-    </div>
-  </div>
-</div>
-
-<div id="dbg-panel" aria-label="Debug log"></div>
-
-<footer>Cloud path · USE_BROADCAST_INLINE=true (inline PNG) · video never stored permanently</footer>
 </div><!-- #page-rotate-wrapper -->
+
+<!-- fixed bottom status bar, shown once camera is running -->
+<div id="inline-status"></div>
+
+<!-- devmode toggle button: shown by the devmode IIFE when ?dev=1 -->
+<button id="devmode-toggle-btn" title="Toggle dev panel">⚙</button>
+<!-- devmode panel: built and populated by the devmode IIFE -->
+<div id="devmode-panel">
+  <!-- feed controls injected here first by the IIFE (insertAdjacentHTML afterbegin) -->
+  <!-- debug panels follow -->
+  <div id="motion-graph-wrap" aria-label="Motion graph">
+    <div id="motion-graph-label">
+      <span id="motion-graph-cur">diff —</span>
+      <span id="motion-graph-peak">peak —</span>
+      <span id="motion-graph-thresh">thr —</span>
+    </div>
+    <canvas id="motion-graph" width="440" height="72"></canvas>
+  </div>
+  <div id="canvas-preview-wrap" aria-label="Canvas preview">
+    <div id="canvas-preview-label">Canvas preview (debug)</div>
+    <div id="canvas-preview-row">
+      <div class="cpv-block">
+        <span>sfCanvas 160×120 (motion)</span>
+        <canvas id="cpv-sf" width="160" height="120"></canvas>
+      </div>
+      <div class="cpv-block">
+        <span>capCanvas 320×240 (settle)</span>
+        <canvas id="cpv-cap" width="320" height="240"></canvas>
+      </div>
+    </div>
+  </div>
+  <div id="dbg-panel" aria-label="Debug log"></div>
+</div>
 
 <button id="rotate-toggle-btn" title="Toggle page rotation" onclick="(function(){
     var w = document.getElementById('page-rotate-wrapper');
@@ -380,8 +480,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = 'b808938';
-  var BUILD_TIME     = '2026-06-25 18:11 UTC';
+  var GIT_COMMIT     = '712e13e';
+  var BUILD_TIME     = '2026-06-25 18:25 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -486,15 +586,11 @@
     statusIcon.textContent = icon;
     statusText.textContent = text;
     statusSub.textContent  = sub || '';
+    var inl = document.getElementById('inline-status');
+    if (inl && inl.style.display !== 'none') inl.textContent = icon + '\u2009' + text;
   }
-  function hasTorch(track) {
-    if (!track || !track.getCapabilities) return false;
-    return 'torch' in (track.getCapabilities() || {});
-  }
-  function deviceIdFromTrack(track) {
-    try { return ((track && track.getSettings ? track.getSettings() : {}).deviceId) || null; }
-    catch (_) { return null; }
-  }
+  // hasTorch / deviceIdFromTrack / openStreamForDevice / probeTorchIds
+  // are now provided by RsCameraSelector (rs-phoneui-shared.js).
 
   // ── Camera selector ───────────────────────────────────────────────────────
   function syncFace() {
@@ -514,60 +610,20 @@
   }
 
   async function populateCameras(selectedId, inputs, tIds) {
-    cameraSelect.innerHTML = '';
-    var def = document.createElement('option');
-    def.value = ''; def.textContent = 'Default rear camera';
-    cameraSelect.appendChild(def);
-    var n = 1;
-    for (var i = 0; i < inputs.length; i++) {
-      var d = inputs[i];
-      var o = document.createElement('option');
-      o.value = d.deviceId;
-      var lbl = d.label || ('Camera ' + n++);
-      o.textContent = tIds.has(d.deviceId) ? lbl + ' 🔦' : lbl;
-      cameraSelect.appendChild(o);
-    }
-    var target = selectedId || '';
-    var found = Array.from(cameraSelect.options).some(function(o) { return o.value === target; });
-    cameraSelect.value = found ? target : '';
+    RsCameraSelector.populateSelectEl(cameraSelect, selectedId, inputs, tIds);
     syncFace();
-  }
-
-  async function probeTorchIds(inputs) {
-    var ids = new Set();
-    if (IS_IOS) {
-      // On iOS don't probe — just check the active track
-      if (videoTrack && hasTorch(videoTrack)) { var aid = deviceIdFromTrack(videoTrack); if (aid) ids.add(aid); }
-      return ids;
-    }
-    for (var i = 0; i < inputs.length; i++) {
-      var ps = null;
-      try {
-        ps = await openStreamForDevice(inputs[i].deviceId);
-        var t = ps.getVideoTracks()[0] || null;
-        if (hasTorch(t)) ids.add(inputs[i].deviceId);
-      } catch (_) {
-      } finally { if (ps) ps.getTracks().forEach(function(t) { t.stop(); }); }
-    }
-    return ids;
-  }
-
-  async function openStreamForDevice(deviceId) {
-    var vc = { width: { ideal: 320, min: 160, max: 640 }, height: { ideal: 240, min: 120, max: 480 }, aspectRatio: { ideal: 4/3 }, frameRate: { ideal: 12, max: 15 } };
-    if (deviceId) vc.deviceId = { exact: deviceId }; else vc.facingMode = { ideal: 'environment' };
-    return navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
   }
 
   async function openCamera(deviceId) {
     if (currentStream) { currentStream.getTracks().forEach(function(t) { t.stop(); }); currentStream = null; videoTrack = null; }
-    var stream = await openStreamForDevice(deviceId);
+    var stream = await RsCameraSelector.openStreamForDevice(deviceId);
     currentStream = stream;
     videoTrack    = stream.getVideoTracks()[0] || null;
     video.srcObject = stream;
     await video.play();
     previewOverlay.classList.add('hidden');
     // Torch button + auto-enable
-    if (hasTorch(videoTrack)) {
+    if (RsCameraSelector.hasTorchCapability(videoTrack)) {
       torchBtn.style.display = '';
       try {
         await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
@@ -714,7 +770,7 @@
   function _releaseCamera() {
     if (!cameraStarted) return;
     cameraStarted = false;
-    startBtn.textContent = 'Start camera';
+    startBtn.textContent = 'Start Camera';
     startBtn.disabled = false;
     if (frameTimerId !== null) { clearInterval(frameTimerId); frameTimerId = null; }
     if (torchEnabled) {
@@ -786,7 +842,7 @@
     if (r.inMotion) {
       lastMotionFrame = frameSeq; settleFired = false;
       motionDot.classList.add('active');
-      setStatus('🎲', 'Motion detected…', 'Keep rolling!');
+      setStatus('🎲', 'Roll detected…', 'Keep rolling!');
       // Send a display-only preview frame on the first above-threshold motion frame
       // of each throw — pure eye candy, Python will not run analysis on it.
       if (!_grabPreviewSent && r.diff_mean > GRAB_THRESHOLD && !uploading) {
@@ -802,7 +858,7 @@
         var peak = motionDetector.peakBeforeSettle(JUST_SETTLED_DELAY_FRAMES, GRAB_SPIKE_WINDOW);
         motionDetector.markSettle(peak);
         if (peak > GRAB_THRESHOLD && !uploading) { uploadSettledFrame(peak, frameSeq); }
-        else if (!uploading) { setStatus('👀', 'Watching for motion…', 'Point camera at the dice tray'); }
+        else if (!uploading) { setStatus('👀', 'Watching for roll...', 'Point camera at the dice tray'); }
       }
     }
     if (debugMode) {
@@ -887,6 +943,9 @@
     if (_mgWrap) _mgWrap.classList.add('visible');
     var _cpvWrap = document.getElementById('canvas-preview-wrap');
     if (_cpvWrap) _cpvWrap.classList.add('visible');
+    // Auto-open the devmode panel so debug elements are visible without a click.
+    var _dmPanel = document.getElementById('devmode-panel');
+    if (_dmPanel) _dmPanel.classList.add('open');
   }
   // Log version immediately so it appears at the top of the debug panel
   // (broadcastChannel not yet open here, so console-only)
@@ -1059,7 +1118,7 @@
 
     if (!initSupabase()) {
       showError('Supabase unavailable', 'Could not load the Supabase library. Check your internet connection and reload.');
-      startBtn.disabled = false; startBtn.textContent = 'Start camera'; return;
+      startBtn.disabled = false; startBtn.textContent = 'Start Camera'; return;
     }
 
     var chosenId = cameraSelect.value || null;
@@ -1074,19 +1133,16 @@
     try {
       var devs = await navigator.mediaDevices.enumerateDevices();
       var vids  = devs.filter(function(d) { return d.kind === 'videoinput'; });
-      torchIds = await probeTorchIds(vids);
+      torchIds = await RsCameraSelector.probeTorchIds(vids, IS_IOS, videoTrack);
       // Re-enumerate: browsers reveal real labels + deviceIds after first getUserMedia
       var fresh = await navigator.mediaDevices.enumerateDevices();
       var fvids  = fresh.filter(function(d) { return d.kind === 'videoinput'; });
       // iOS preference: pick rear, non-Wide camera as default
       if (IS_IOS && !chosenId) {
-        var pref = fvids.find(function(d) {
-          var lbl = (d.label || '').toLowerCase();
-          return lbl && (lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment')) && !lbl.includes('wide');
-        });
+        var pref = RsCameraSelector.getPreferredIosCamera(fvids);
         if (pref && pref.deviceId) { chosenId = pref.deviceId; try { await openCamera(chosenId); } catch(_) {} }
       }
-      var activeId = deviceIdFromTrack(videoTrack) || chosenId || '';
+      var activeId = RsCameraSelector.deviceIdFromTrack(videoTrack) || chosenId || '';
       await populateCameras(activeId, fvids, torchIds);
       _sendCamLabel();  // report active camera label to Companion
     } catch (e) { console.warn('camera enumeration failed:', e); }
@@ -1094,12 +1150,36 @@
     ensureCanvases();
     motionDetector.reset();
     cameraStarted = true;
-    startBtn.textContent = 'Running…';
-    setStatus('👀', 'Watching for motion…', 'Point camera at the dice tray');
+    // Switch to compact inline status: hide the big status bar and the button.
+    var statusBar = document.getElementById('status-bar');
+    var inlineStatus = document.getElementById('inline-status');
+    if (statusBar) statusBar.classList.add('running');
+    startBtn.style.display = 'none';
+    if (inlineStatus) { inlineStatus.style.display = 'block'; inlineStatus.textContent = '\uD83D\uDC41\u2009Watching for roll\u2026'; }
+    setStatus('\uD83D\uDC41', 'Watching for motion\u2026', 'Point camera at the dice tray');
     frameTimerId = setInterval(processFrame, Math.round(1000 / 12));
 
     if (!isDev) { try { posthog.capture('cloud_session_started', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
   });
+
+  // In shim mode, auto-click Start Camera so the user doesn't have to tap it.
+  if (isShim) {
+    setTimeout(function () { startBtn.click(); }, 300);
+  }
+
+  // ── Info overlay ──────────────────────────────────────────────────────────
+  (function () {
+    var overlay = document.getElementById('info-overlay');
+    document.getElementById('info-btn').addEventListener('click', function () {
+      overlay.classList.add('open');
+    });
+    document.getElementById('info-dismiss-btn').addEventListener('click', function () {
+      overlay.classList.remove('open');
+    });
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.classList.remove('open');
+    });
+  })();
 
 })();
 </script>
