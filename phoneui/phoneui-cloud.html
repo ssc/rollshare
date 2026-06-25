@@ -60,9 +60,9 @@
     }
     header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.65rem; text-align: center; }
     header .header-title-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
-    header .header-title-row img { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; }
-    header h1 { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 1.1rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin: 0; }
-    header p  { color: #777; font-size: 0.8rem; margin-top: 0.25rem; }
+    header .header-title-row img { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; }
+    header h1 { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin: 0; }
+    header p  { color: #777; font-size: 1.0rem; margin-top: 0.25rem; }
 
     #error-banner {
       display: none;
@@ -233,9 +233,9 @@
     #cam-content {
       flex: 1; display: flex; flex-direction: column; justify-content: center;
     }
-    #rotate-toggle-btn { position: fixed; bottom: 1rem; left: 1rem; z-index: 10001; width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.15rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    #rotate-toggle-btn { position: fixed; bottom: 1rem; left: 1rem; z-index: 10001; width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode floating button — bottom-right, mirrors rotate button */
-    #devmode-toggle-btn { position: fixed; bottom: 1rem; right: 1rem; z-index: 10001; width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 1px solid #f97316; background: rgba(30,20,10,0.85); color: #f97316; font-size: 1.05rem; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    #devmode-toggle-btn { position: fixed; bottom: 1rem; right: 1rem; z-index: 10001; width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #f97316; background: rgba(30,20,10,0.85); color: #f97316; font-size: 1.4rem; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode overlay panel */
     #devmode-panel {
       display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10000;
@@ -372,36 +372,6 @@
 <!-- fixed bottom status bar, shown once camera is running -->
 <div id="inline-status"></div>
 
-<!-- devmode toggle button: shown by the devmode IIFE when ?dev=1 -->
-<button id="devmode-toggle-btn" title="Toggle dev panel">⚙</button>
-<!-- devmode panel: built and populated by the devmode IIFE -->
-<div id="devmode-panel">
-  <!-- feed controls injected here first by the IIFE (insertAdjacentHTML afterbegin) -->
-  <!-- debug panels follow -->
-  <div id="motion-graph-wrap" aria-label="Motion graph">
-    <div id="motion-graph-label">
-      <span id="motion-graph-cur">diff —</span>
-      <span id="motion-graph-peak">peak —</span>
-      <span id="motion-graph-thresh">thr —</span>
-    </div>
-    <canvas id="motion-graph" width="440" height="72"></canvas>
-  </div>
-  <div id="canvas-preview-wrap" aria-label="Canvas preview">
-    <div id="canvas-preview-label">Canvas preview (debug)</div>
-    <div id="canvas-preview-row">
-      <div class="cpv-block">
-        <span>sfCanvas 160×120 (motion)</span>
-        <canvas id="cpv-sf" width="160" height="120"></canvas>
-      </div>
-      <div class="cpv-block">
-        <span>capCanvas 320×240 (settle)</span>
-        <canvas id="cpv-cap" width="320" height="240"></canvas>
-      </div>
-    </div>
-  </div>
-  <div id="dbg-panel" aria-label="Debug log"></div>
-</div>
-
 <button id="rotate-toggle-btn" title="Toggle page rotation" onclick="(function(){
     var w = document.getElementById('page-rotate-wrapper');
     var rotated = w.style.transform !== 'none';
@@ -480,8 +450,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '712e13e';
-  var BUILD_TIME     = '2026-06-25 18:25 UTC';
+  var GIT_COMMIT     = '9b2cc8e';
+  var BUILD_TIME     = '2026-06-25 18:55 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -1162,8 +1132,8 @@
     if (!isDev) { try { posthog.capture('cloud_session_started', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
   });
 
-  // In shim mode, auto-click Start Camera so the user doesn't have to tap it.
-  if (isShim) {
+  // Auto-click Start Camera on page load. Pass ?noautostart=1 to suppress (used by automated tests).
+  if (!params.get('noautostart')) {
     setTimeout(function () { startBtn.click(); }, 300);
   }
 
