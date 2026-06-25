@@ -8,6 +8,22 @@
     (function() {
       var _p = new URLSearchParams(window.location.search);
       if (_p.get('dev') === '1') window._rollshare_dev = true;
+      // ?shim=1 — load local broadcast relay shim instead of real Supabase CDN.
+      // The shim must be fetched synchronously (document.write) so it installs
+      // window.supabase before the CDN <script> tag below is evaluated.
+      if (_p.get('shim') === '1') {
+        var _relayParam = _p.get('relay') || '';
+        // relay= can be a full ws:// URL or an https:// base.
+        if (_relayParam.match(/^wss?:\/\//)) {
+          window.ROLLSHARE_RELAY_URL = _relayParam.replace(/\/?$/, '') + '/devmode/broadcast-relay';
+        } else {
+          var _relayBase = _relayParam || 'https://localhost:9090';
+          window.ROLLSHARE_RELAY_URL = _relayBase.replace(/^https/, 'wss').replace(/^http(?!s)/, 'ws') + '/devmode/broadcast-relay';
+        }
+        // Load shim from same-origin http:// to avoid self-signed cert rejection.
+        // serve-phoneui.ps1 caches it at phoneui/broadcast-relay-shim.js on startup.
+        document.write('<script src="broadcast-relay-shim.js"><\/script>');
+      }
     })();
     if (!window._rollshare_dev) {
       !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+" (stub)"},o="init bs ws ge fs capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
@@ -19,7 +35,16 @@
       posthog.register({ surface: 'app', subsurface: 'phoneui-cloud' });
     }
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    // Only load the real Supabase CDN when NOT in shim mode.
+    // In shim mode, broadcast-relay-shim.js (loaded above) already installed
+    // window.supabase and the CDN would overwrite it.
+    if (new URLSearchParams(location.search).get('shim') !== '1') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"><\/script>');
+    }
+  </script>
+  <!-- Canvas stream generators shared with phoneui-direct (loaded via @@shared-js there). -->
+  <script src="rs-phoneui-shared.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -56,7 +81,7 @@
     }
     #cam-video {
       width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block;
-      transform: rotate(180deg); /* phone placed over tray; 180° corrects orientation, matching phoneui.html */
+      transform: rotate(180deg); /* phone placed over tray; 180° corrects orientation, matching phoneui-direct.html */
     }
     #preview-overlay {
       position: absolute; inset: 0;
@@ -187,12 +212,23 @@
 
     #page-rotate-wrapper {
       max-width: 480px; margin: 0 auto; padding: 0 1rem 1rem;
-      transform: rotate(180deg); transform-origin: center center;
     }
+    #rotate-toggle-btn { position: fixed; bottom: 1rem; left: 1rem; z-index: 10001; width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.15rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
   </style>
 </head>
 <body>
 <div id="page-rotate-wrapper">
+<script>
+  (function () {
+    var saved = localStorage.getItem('rs_page_rotated');
+    // Default is rotated (null = first visit, treat as rotated=true)
+    var rotated = saved === null ? true : saved === '1';
+    var val = rotated ? 'rotate(180deg)' : 'none';
+    var orig = rotated ? 'center center' : '';
+    var el = document.getElementById('page-rotate-wrapper');
+    if (el) { el.style.transform = val; el.style.transformOrigin = orig; }
+  })();
+</script>
 
 <header>
   <h1>RollShare Cloud</h1>
@@ -266,6 +302,20 @@
 <footer>Cloud path · USE_BROADCAST_INLINE=true (inline PNG) · video never stored permanently</footer>
 </div><!-- #page-rotate-wrapper -->
 
+<button id="rotate-toggle-btn" title="Toggle page rotation" onclick="(function(){
+    var w = document.getElementById('page-rotate-wrapper');
+    var rotated = w.style.transform !== 'none';
+    if (rotated) {
+        w.style.transform = 'none';
+        w.style.transformOrigin = '';
+        localStorage.setItem('rs_page_rotated', '0');
+    } else {
+        w.style.transform = 'rotate(180deg)';
+        w.style.transformOrigin = 'center center';
+        localStorage.setItem('rs_page_rotated', '1');
+    }
+})()">↻</button>
+
 <script>
 (function () {
   "use strict";
@@ -330,11 +380,49 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '082b41b';
-  var BUILD_TIME     = '2026-06-25 02:16 UTC';
+  var GIT_COMMIT     = 'b808938';
+  var BUILD_TIME     = '2026-06-25 18:11 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
+  var isShim         = params.get('shim') === '1';  // local relay mode — fake camera allowed
+
+  // ── Fake camera (shim/dev mode) ───────────────────────────────────────────
+  // When ?shim=1 is set, replace getUserMedia with a synthetic canvas stream
+  // so "Start camera" works without a real device.  The dev panel can then
+  // swap to noise / blocks / dice-clip feeds as usual.
+  if (isShim && typeof MediaStream !== 'undefined') {
+    var _fakeCanvas = document.createElement('canvas');
+    _fakeCanvas.width = 160; _fakeCanvas.height = 120;
+    (function _paintFake() {
+      var ctx = _fakeCanvas.getContext('2d');
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, 160, 120);
+      ctx.fillStyle = '#4af';
+      ctx.font = '13px monospace';
+      ctx.fillText('Fake cam (shim)', 8, 62);
+      setTimeout(_paintFake, 500);
+    })();
+    var _fakeGetUserMedia = function() {
+      var stream = _fakeCanvas.captureStream ? _fakeCanvas.captureStream(10) : new MediaStream();
+      return Promise.resolve(stream);
+    };
+    var _fakeEnumerateDevices = function() {
+      return Promise.resolve([{ kind: 'videoinput', deviceId: 'fake', label: 'Fake Camera (shim)', groupId: '' }]);
+    };
+    // Patch methods on the existing mediaDevices object (it's read-only in Chrome).
+    if (navigator.mediaDevices) {
+      try { navigator.mediaDevices.getUserMedia = _fakeGetUserMedia; } catch(_) {}
+      try { navigator.mediaDevices.enumerateDevices = _fakeEnumerateDevices; } catch(_) {}
+    } else {
+      try {
+        Object.defineProperty(navigator, 'mediaDevices', {
+          value: { getUserMedia: _fakeGetUserMedia, enumerateDevices: _fakeEnumerateDevices },
+          configurable: true,
+        });
+      } catch(_) {}
+    }
+  }
 
   var video           = document.getElementById('cam-video');
   var previewOverlay  = document.getElementById('preview-overlay');
@@ -376,7 +464,9 @@
   var capCanvas       = null;
 
   // ── Rendezvous key validation ─────────────────────────────────────────────
-  if (!rendezvousKey || rendezvousKey.length < 10) {
+  // In shim/dev mode accept any non-empty key (allows short test keys like DEVTEST001).
+  var _keyMinLen = (isShim || isDev) ? 1 : 10;
+  if (!rendezvousKey || rendezvousKey.length < _keyMinLen) {
     showError('Invalid link', 'This QR code is missing the rendezvous key. Please rescan the QR code shown on the RollShare Companion App.');
     startBtn.disabled = true;
   } else {
