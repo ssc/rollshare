@@ -52,7 +52,6 @@
       background: #0a0a1a;
       color: #e8e8e8;
       height: 100dvh;
-      overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -141,7 +140,7 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     #camera-select-face::after {
-      content: "BE";
+      content: "▾";
       position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%);
       color: #555; pointer-events: none;
     }
@@ -238,8 +237,8 @@
       flex: 1; display: flex; flex-direction: column; justify-content: center;
       align-items: stretch; width: 100%;
     }
-    #bottom-tray { width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 1rem 0; flex-shrink: 0; }
-    #rotate-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    #bottom-tray { width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; padding: 5px 1rem 5px; flex-shrink: 0; }
+    #rotate-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.5rem; cursor: pointer; position: relative; overflow: hidden; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode floating button — right side of bottom tray */
     #devmode-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #f97316; background: rgba(30,20,10,0.85); color: #f97316; font-size: 1.4rem; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode overlay panel */
@@ -297,18 +296,19 @@
   </style>
 </head>
 <body>
-<div id="page-rotate-wrapper">
 <script>
+  // Apply rotation to <body> so Chrome Android hit-testing follows the transform.
+  // Rotating a child wrapper div breaks touch event coordinates on Android Chrome.
   (function () {
     var saved = localStorage.getItem('rs_page_rotated');
-    // Default is rotated (null = first visit, treat as rotated=true)
     var rotated = saved === null ? true : saved === '1';
-    var val = rotated ? 'rotate(180deg)' : 'none';
-    var orig = rotated ? 'center center' : '';
-    var el = document.getElementById('page-rotate-wrapper');
-    if (el) { el.style.transform = val; el.style.transformOrigin = orig; }
+    if (rotated) {
+      document.body.style.transform = 'rotate(180deg)';
+      document.body.style.transformOrigin = 'center center';
+    }
   })();
 </script>
+<div id="page-rotate-wrapper">
 
 <div id="cam-content">
 <header>
@@ -376,18 +376,17 @@
 
 <div id="bottom-tray">
   <button id="rotate-toggle-btn" title="Toggle page rotation" onclick="(function(){
-    var w = document.getElementById('page-rotate-wrapper');
-    var rotated = w.style.transform !== 'none';
+    var rotated = document.body.style.transform === 'rotate(180deg)';
     if (rotated) {
-        w.style.transform = 'none';
-        w.style.transformOrigin = '';
+        document.body.style.transform = 'none';
+        document.body.style.transformOrigin = '';
         localStorage.setItem('rs_page_rotated', '0');
     } else {
-        w.style.transform = 'rotate(180deg)';
-        w.style.transformOrigin = 'center center';
+        document.body.style.transform = 'rotate(180deg)';
+        document.body.style.transformOrigin = 'center center';
         localStorage.setItem('rs_page_rotated', '1');
     }
-})()"><span style="display:inline-block;transform:rotate(90deg)">↷</span></button>
+})()"><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(90deg)">↷</span></button>
   <!-- devmode toggle: shown by IIFE when ?dev=1; harmless hidden button on production -->
   <button id="devmode-toggle-btn" title="Toggle dev panel">⚙</button>
 </div>
@@ -463,8 +462,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = 'b887b91';
-  var BUILD_TIME     = '2026-06-25 19:58 UTC';
+  var GIT_COMMIT     = '97056b9';
+  var BUILD_TIME     = '2026-06-25 21:12 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -917,7 +916,7 @@
 
   // ── Debug log panel ────────────────────────────────────────────────────────
   var dbgPanel = document.getElementById('dbg-panel');
-  var debugMode = /[?&]debug/.test(window.location.search) || /[?&]dev=1/.test(window.location.search);
+  var debugMode = /[?&]debug=1/.test(window.location.search);
   if (debugMode) {
     dbgPanel.classList.add('visible');
     var _mgWrap = document.getElementById('motion-graph-wrap');
@@ -1119,9 +1118,6 @@
 
     // Enumerate cameras now that we have permission to see labels
     try {
-      var devs = await navigator.mediaDevices.enumerateDevices();
-      var vids  = devs.filter(function(d) { return d.kind === 'videoinput'; });
-      torchIds = await RsCameraSelector.probeTorchIds(vids, IS_IOS, videoTrack);
       // Re-enumerate: browsers reveal real labels + deviceIds after first getUserMedia
       var fresh = await navigator.mediaDevices.enumerateDevices();
       var fvids  = fresh.filter(function(d) { return d.kind === 'videoinput'; });
@@ -1131,7 +1127,11 @@
         if (pref && pref.deviceId) { chosenId = pref.deviceId; try { await openCamera(chosenId); } catch(_) {} }
       }
       var activeId = RsCameraSelector.deviceIdFromTrack(videoTrack) || chosenId || '';
-      await populateCameras(activeId, fvids, torchIds);
+      // Populate cameras immediately so the list appears right away (no torch info yet).
+      await populateCameras(activeId, fvids, new Set());
+      // Probe torch capabilities (slow multi-camera scan on Android), then re-populate.
+      torchIds = await RsCameraSelector.probeTorchIds(fvids, IS_IOS, videoTrack);
+      if (torchIds.size) await populateCameras(activeId, fvids, torchIds);
       _sendCamLabel();  // report active camera label to Companion
     } catch (e) { console.warn('camera enumeration failed:', e); }
 
@@ -1179,13 +1179,16 @@
       _previewAttempted = true;
       try {
         await openCamera(null);
-        // Preview live — user presses Start to begin motion detection
+        // Preview live — hide start button and auto-start motion loop.
+        // No gesture needed on Android/desktop so we can click programmatically.
+        startBtn.style.display = 'none';
+        startBtn.click();
       } catch(err) {
         if (err.name === 'NotAllowedError') {
           // iOS Safari: needs a real gesture before getUserMedia
           if (_tapOverlay) _tapOverlay.classList.add('show');
         }
-        // Other errors: leave preview-overlay visible
+        // Other errors: leave preview-overlay + start button visible
       }
     }
     setTimeout(_tryOpenPreview, 400);
