@@ -462,8 +462,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '97056b9';
-  var BUILD_TIME     = '2026-06-25 21:12 UTC';
+  var GIT_COMMIT     = '57110b4';
+  var BUILD_TIME     = '2026-06-25 21:31 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -1131,6 +1131,17 @@
       await populateCameras(activeId, fvids, new Set());
       // Probe torch capabilities (slow multi-camera scan on Android), then re-populate.
       torchIds = await RsCameraSelector.probeTorchIds(fvids, IS_IOS, videoTrack);
+      // If the active camera has no torch, switch to the first rear camera that does.
+      if (torchIds.size && !torchIds.has(activeId)) {
+        var preferTorch = fvids.find(function(d) {
+          if (!torchIds.has(d.deviceId)) return false;
+          var lbl = (d.label || '').toLowerCase();
+          return lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment');
+        });
+        if (preferTorch) {
+          try { await openCamera(preferTorch.deviceId); activeId = preferTorch.deviceId; } catch(_) {}
+        }
+      }
       if (torchIds.size) await populateCameras(activeId, fvids, torchIds);
       _sendCamLabel();  // report active camera label to Companion
     } catch (e) { console.warn('camera enumeration failed:', e); }
