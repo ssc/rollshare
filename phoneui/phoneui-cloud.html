@@ -58,7 +58,7 @@
       align-items: center;
       padding: 0.85rem 0.85rem 0.85rem;
     }
-    header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.65rem; text-align: center; }
+    header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.5rem; text-align: center; }
     header .header-title-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
     header .header-title-row img { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; }
     header h1 { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin: 0; }
@@ -77,10 +77,10 @@
     #preview-wrap {
       width: 100%; max-width: 460px;
       position: relative;
-      border-radius: 12px; overflow: hidden;
+      border-radius: 12px 12px 0 0; overflow: hidden;
       background: #111;
       aspect-ratio: 4/3;
-      margin: 0 auto 0.65rem;
+      margin: 0 auto 0;
     }
     #cam-video {
       width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block;
@@ -106,16 +106,17 @@
 
     /* ── Status bar ── */
     #status-bar {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 9998;
-      background: #111c17; border-top: 1px solid #1f3d2d;
-      padding: 0.45rem 0.9rem 0.5rem;
-      display: flex; align-items: center; gap: 0.55rem;
+      width: 100%; max-width: 460px;
+      background: #111c17; border: 1px solid #1f3d2d; border-radius: 0 0 10px 10px;
+      padding: 0.3rem 0.75rem;
+      display: flex; align-items: center; gap: 0.4rem;
+      margin: 0 auto 0.6rem;
     }
-    #status-icon { font-size: 1.3rem; flex-shrink: 0; }
-    #status-text { font-size: 0.86rem; font-weight: 600; color: #86efac; }
-    #status-sub  { font-size: 0.74rem; color: #6b9b7a; margin-top: 0.05rem; }
-    #session-chip { font-family: monospace; font-size: 0.66rem; color: #4a8a60; margin-top: 0.1rem; letter-spacing: 0.04em; }
-    #status-version { font-family: monospace; font-size: 0.6rem; color: #2a5a3a; margin-left: auto; flex-shrink: 0; align-self: flex-end; padding-bottom: 0.05rem; }
+    #status-icon { font-size: 0.85rem; flex-shrink: 0; }
+    #status-text { font-size: 0.72rem; font-weight: 600; color: #86efac; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #status-sub  { display: none; }
+    #session-chip { display: none; }
+    #status-version { font-family: monospace; font-size: 0.6rem; color: #2a5a3a; margin-left: auto; flex-shrink: 0; }
     /* tap-to-start overlay — shown on iOS when autostart needs a real gesture */
     #tap-overlay {
       display: none; position: fixed; inset: 0; z-index: 19999;
@@ -172,15 +173,7 @@
     #start-btn:active { background: #14532d; }
     #start-btn:disabled { background: #1a3020; color: #3a6040; cursor: default; }
     /* compact status bar pinned to the bottom of the screen */
-    #inline-status {
-      display: none;
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;
-      padding: 0.38rem 1rem 0.45rem;
-      background: #0d1f14; border-top: 1px solid #1f3d2d;
-      font-size: 0.75rem; color: #86efac;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    #status-bar.running { display: none; }
+    #status-bar.running { /* stays visible in-flow below preview */ }
 
     /* upload progress */
     #upload-bar-wrap {
@@ -243,7 +236,7 @@
     }
     #cam-content {
       flex: 1; display: flex; flex-direction: column; justify-content: center;
-      padding-bottom: 3.5rem; /* clear fixed #status-bar at bottom */
+      align-items: stretch; width: 100%;
     }
     #rotate-toggle-btn { position: fixed; bottom: 1rem; left: 1rem; z-index: 10001; width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode floating button — bottom-right, mirrors rotate button */
@@ -316,6 +309,7 @@
   })();
 </script>
 
+<div id="cam-content">
 <header>
   <div class="header-title-row">
     <img src="../assets/rollshare_logo.png" alt="RollShare" />
@@ -338,7 +332,6 @@
   </div>
 </div>
 
-<div id="cam-content">
 <div id="error-banner" role="alert">
   <strong id="error-title">Something went wrong</strong>
   <span id="error-msg">Check that the QR code is valid and the Companion App is running.</span>
@@ -349,7 +342,7 @@
   <video id="cam-video" autoplay playsinline muted></video>
   <div id="preview-overlay">
     <span class="pi">📷</span>
-    <span>Tap “Start camera” below</span>
+    <span>Opening camera…</span>
   </div>
   <div id="motion-dot" title="Motion indicator"></div>
 </div>
@@ -357,11 +350,9 @@
 <!-- Status -->
 <div id="status-bar">
   <span id="status-icon">⏳</span>
-  <div>
-    <div id="status-text">Ready</div>
-    <div id="status-sub">Starting camera…</div>
-    <div id="session-chip"></div>
-  </div>
+  <span id="status-text">Ready</span>
+  <div id="status-sub" style="display:none"></div>
+  <div id="session-chip" style="display:none"></div>
   <span id="status-version"></span>
 </div>
 
@@ -382,7 +373,8 @@
 
 </div><!-- #page-rotate-wrapper -->
 
-<!-- tap-to-start overlay: shown on iOS when autostart needs a real gesture -->
+<!-- fixed bottom status bar replaced by in-flow #status-bar -->
+<div id="inline-status" style="display:none"></div>
 <div id="tap-overlay">
   <span class="tap-icon">📷</span>
   <span class="tap-msg">Tap anywhere to start</span>
@@ -404,7 +396,7 @@
         w.style.transformOrigin = 'center center';
         localStorage.setItem('rs_page_rotated', '1');
     }
-})()">↻</button>
+})()"><span style="display:inline-block;transform:rotate(90deg)">↷</span></button>
 
 <script>
 (function () {
@@ -470,8 +462,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = 'e87607c';
-  var BUILD_TIME     = '2026-06-25 19:04 UTC';
+  var GIT_COMMIT     = '274d2c3';
+  var BUILD_TIME     = '2026-06-25 19:42 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -576,8 +568,6 @@
     statusIcon.textContent = icon;
     statusText.textContent = text;
     statusSub.textContent  = sub || '';
-    var inl = document.getElementById('inline-status');
-    if (inl && inl.style.display !== 'none') inl.textContent = icon + '\u2009' + text;
   }
   // hasTorch / deviceIdFromTrack / openStreamForDevice / probeTorchIds
   // are now provided by RsCameraSelector (rs-phoneui-shared.js).
@@ -1087,7 +1077,7 @@
   startBtn.addEventListener('click', async function () {
     if (cameraStarted) return;
     startBtn.disabled = true; startBtn.textContent = 'Starting…';
-    setStatus('⏳', 'Requesting camera…', 'Allow camera access when prompted');
+    setStatus('⏳', 'Starting…', '');
 
     // Request geolocation now — inside a user gesture so browsers allow the permission prompt.
     // Fire-and-forget: send a geo broadcast whenever the position arrives (or silently skip if denied).
@@ -1112,11 +1102,18 @@
     }
 
     var chosenId = cameraSelect.value || null;
-    try { await openCamera(chosenId); }
-    catch (err) {
-      showError('Camera access denied', 'Please allow camera access and try again. ' + (err.message || err));
-      startBtn.disabled = false; startBtn.textContent = 'Start camera';
-      setStatus('📷', 'Camera not available', 'Grant camera permission above'); return;
+    // Only open camera if the preview-on-load path hasn't already opened it.
+    // If the user picked a different device, re-open with that device.
+    if (!currentStream) {
+      setStatus('⏳', 'Requesting camera…', 'Allow camera access when prompted');
+      try { await openCamera(chosenId); }
+      catch (err) {
+        showError('Camera access denied', 'Please allow camera access and try again. ' + (err.message || err));
+        startBtn.disabled = false; startBtn.textContent = 'Start Camera';
+        setStatus('📷', 'Camera not available', 'Grant camera permission above'); return;
+      }
+    } else if (chosenId && chosenId !== currentDeviceId) {
+      try { await openCamera(chosenId); } catch (_) {}
     }
 
     // Enumerate cameras now that we have permission to see labels
@@ -1140,59 +1137,57 @@
     ensureCanvases();
     motionDetector.reset();
     cameraStarted = true;
-    // Switch to compact inline status: hide the big status bar and the button.
-    var statusBar = document.getElementById('status-bar');
-    var inlineStatus = document.getElementById('inline-status');
-    if (statusBar) statusBar.classList.add('running');
+    // Keep status-bar visible in-flow; just hide the controls.
     startBtn.style.display = 'none';
-    if (inlineStatus) { inlineStatus.style.display = 'block'; inlineStatus.textContent = '\uD83D\uDC41\u2009Watching for roll\u2026'; }
     setStatus('\uD83D\uDC41', 'Watching for motion\u2026', 'Point camera at the dice tray');
     frameTimerId = setInterval(processFrame, Math.round(1000 / 12));
 
     if (!isDev) { try { posthog.capture('cloud_session_started', { rendezvous_short: rendezvousKey.slice(-6) }); } catch(_) {} }
   });
 
-  // ── Auto-start camera on page load ───────────────────────────────────────
-  // On Android/desktop, getUserMedia works without a prior gesture so we can
-  // fire the start immediately.  On iOS Safari it requires a real touch event;
-  // if the instant attempt fails we show a full-screen tap overlay so the
-  // user's first tap (a genuine gesture) triggers the start.
+  // ── Open camera preview on page load ────────────────────────────────────
+  // Show the live camera feed immediately (like phoneui-direct) so the user
+  // can frame their shot before pressing Start.  The motion-detection loop
+  // only begins on button press.
+  // On iOS Safari getUserMedia needs a real touch gesture; if the attempt
+  // fails with NotAllowedError we show the tap overlay — but the tap only
+  // opens the preview, not the full stream.
   // Pass ?noautostart=1 to suppress entirely (used by automated tests).
+
+  // Stamp version into status bar (always, not just when autostart)
+  (function() {
+    var v = document.getElementById('status-version');
+    if (v && APP_VERSION && APP_VERSION !== '1.0.86') v.textContent = 'v' + APP_VERSION;
+  })();
+
+  var _tapOverlay = document.getElementById('tap-overlay');
+  if (_tapOverlay) {
+    _tapOverlay.addEventListener('click', async function() {
+      _tapOverlay.classList.remove('show');
+      // On iOS this click is a real gesture — open preview only
+      if (!currentStream) {
+        try { await openCamera(null); } catch(_) {}
+      }
+    });
+  }
+
   if (!params.get('noautostart')) {
-    // Stamp version into status bar
-    (function() {
-      var v = document.getElementById('status-version');
-      if (v && APP_VERSION && APP_VERSION !== '1.0.86') v.textContent = 'v' + APP_VERSION;
-    })();
-
-    // Try immediate start — works on Android Chrome and desktop
-    var _autoAttempted = false;
-    function _tryAutoStart() {
-      if (_autoAttempted || cameraStarted) return;
-      _autoAttempted = true;
-      // Probe getUserMedia quickly; if it needs a gesture it will throw NotAllowedError
-      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-        .then(function(probe) {
-          // Stop the probe stream — openCamera will open the real one
-          probe.getTracks().forEach(function(t) { t.stop(); });
-          startBtn.click();
-        })
-        .catch(function(err) {
-          // NotAllowedError on iOS means we need a gesture — show tap overlay
-          var tapOverlay = document.getElementById('tap-overlay');
-          if (tapOverlay) tapOverlay.classList.add('show');
-        });
+    var _previewAttempted = false;
+    async function _tryOpenPreview() {
+      if (_previewAttempted || currentStream || cameraStarted) return;
+      _previewAttempted = true;
+      try {
+        await openCamera(null);
+        // Preview live — user presses Start to begin motion detection
+      } catch(err) {
+        if (err.name === 'NotAllowedError') {
+          // iOS Safari: needs a real gesture before getUserMedia
+          if (_tapOverlay) _tapOverlay.classList.add('show');
+        }
+        // Other errors: leave preview-overlay visible
+      }
     }
-
-    var _tapOverlay = document.getElementById('tap-overlay');
-    if (_tapOverlay) {
-      _tapOverlay.addEventListener('click', function() {
-        _tapOverlay.classList.remove('show');
-        startBtn.click();
-      });
-    }
-
-    setTimeout(_tryAutoStart, 400);
+    setTimeout(_tryOpenPreview, 400);
   }
 
   // ── Info overlay ──────────────────────────────────────────────────────────
