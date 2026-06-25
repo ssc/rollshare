@@ -330,8 +330,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.86';
-  var GIT_COMMIT     = '5b0093f';
-  var BUILD_TIME     = '2026-06-25 01:34 UTC';
+  var GIT_COMMIT     = '082b41b';
+  var BUILD_TIME     = '2026-06-25 02:16 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -591,6 +591,21 @@
                   ts: Date.now(),
                 },
               }).catch(function () {});
+              // Follow-up: send the real hardware model via User-Agent Client Hints.
+              // Chrome's reduced UA replaces the model with the frozen token 'K'; CH gives
+              // the actual model string (e.g. 'SM-F956B') without requiring a permission.
+              if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+                navigator.userAgentData.getHighEntropyValues(['model']).then(function(hints) {
+                  var _model = (hints && hints.model) ? hints.model.trim() : '';
+                  if (_model && _model !== 'K' && broadcastChannel) {
+                    broadcastChannel.send({
+                      type: 'broadcast', event: 'hello',
+                      payload: { type: 'ua_hints', model: _model },
+                    }).catch(function () {});
+                    dbg('ua_hints model=' + _model);
+                  }
+                }).catch(function () {});
+              }
             }
           });
         // Zombie watchdog: if no heartbeat for 35s after camera started, warn
