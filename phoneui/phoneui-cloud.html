@@ -512,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '306cb10';
-  var BUILD_TIME     = '2026-06-26 18:18 UTC';
+  var GIT_COMMIT     = '8e163fd';
+  var BUILD_TIME     = '2026-06-26 18:31 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -790,6 +790,7 @@
                   type: 'hello',
                   app_version: APP_VERSION,
                   build_time: BUILD_TIME,
+                  js_build_time: (window.RS_JS_BUILD_TIME && window.RS_JS_BUILD_TIME !== '__JS_BUILD_TIME__') ? window.RS_JS_BUILD_TIME : '',
                   ua: navigator.userAgent,
                   platform: navigator.platform || '',
                   screen: screen.width + 'x' + screen.height,
@@ -834,6 +835,7 @@
                   type: 'hello',
                   app_version: APP_VERSION,
                   build_time: BUILD_TIME,
+                  js_build_time: (window.RS_JS_BUILD_TIME && window.RS_JS_BUILD_TIME !== '__JS_BUILD_TIME__') ? window.RS_JS_BUILD_TIME : '',
                   ua: navigator.userAgent,
                   platform: navigator.platform || '',
                   screen: screen.width + 'x' + screen.height,

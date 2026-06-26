@@ -1,4 +1,4 @@
-/* rs-phoneui-shared.js — canvas stream generators shared by phoneui-direct and phoneui-cloud.
+﻿/* rs-phoneui-shared.js — canvas stream generators shared by phoneui-direct and phoneui-cloud.
  *
  * Usage:
  *   phoneui-cloud.html  →  <script src="rs-phoneui-shared.js"></script>  (direct script tag)
@@ -16,6 +16,8 @@
  *   .getCaptureStream(video) → MediaStream | null   (wraps video.captureStream or canvas fallback)
  *   .stopCaptureStream()     → void
  */
+window.RS_JS_BUILD_TIME = '2026-06-26 18:31 UTC';
+
 window.RsDevGenerators = (function () {
     'use strict';
 
