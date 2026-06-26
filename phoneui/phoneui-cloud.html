@@ -512,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = 'cb6e6f1';
-  var BUILD_TIME     = '2026-06-26 20:22 UTC';
+  var GIT_COMMIT     = 'e780a69';
+  var BUILD_TIME     = '2026-06-26 20:30 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -700,10 +700,15 @@
   }
 
   function _sendCamLabel() {
-    if (!broadcastChannel) return;
     var opt = cameraSelect.options[cameraSelect.selectedIndex];
     var label = (opt && opt.value) ? (opt.textContent || '').replace(/\s*🔦$/, '').trim() : '';
     if (!label) return;
+    // Persist so the next session can restore the same camera.
+    try {
+      localStorage.setItem('rs_last_cam_id', opt.value || '');
+      localStorage.setItem('rs_last_cam_label', label);
+    } catch (_) {}
+    if (!broadcastChannel) return;
     broadcastChannel.send({
       type: 'broadcast', event: 'broadcast',
       payload: { type: 'cam_label', label: label },
@@ -1360,6 +1365,22 @@
       if (activeId && RsCameraSelector.hasTorchCapability(videoTrack)) {
         torchIds.add(activeId);
       }
+      // Restore the last-used camera from localStorage (if the user didn't already pick one).
+      // Match by deviceId first, then fall back to label (ids can change across page loads).
+      if (!chosenId) {
+        try {
+          var _lsId    = localStorage.getItem('rs_last_cam_id') || '';
+          var _lsLabel = localStorage.getItem('rs_last_cam_label') || '';
+          var _savedCam = null;
+          if (_lsId)    _savedCam = fvids.find(function(d) { return d.deviceId === _lsId; }) || null;
+          if (!_savedCam && _lsLabel)
+            _savedCam = fvids.find(function(d) { return (d.label || '').replace(/\s*🔦$/, '').trim() === _lsLabel; }) || null;
+          if (_savedCam && _savedCam.deviceId !== activeId) {
+            dbg('restoring saved camera: ' + _lsLabel + ' (' + _savedCam.deviceId.slice(-6) + ')');
+            try { await openCamera(_savedCam.deviceId); activeId = _savedCam.deviceId; } catch(_) {}
+          }
+        } catch (_) {}
+      }
       // If the active camera has no torch, switch to the first rear camera that does.
       if (torchIds.size && !torchIds.has(activeId)) {
         var preferTorch = fvids.find(function(d) {
@@ -1373,7 +1394,7 @@
       }
       // Always re-populate with final torch info (even if torchIds is empty).
       await populateCameras(activeId, fvids, torchIds);
-      _sendCamLabel();  // report active camera label to Companion
+      _sendCamLabel();  // report active camera label to Companion (also saves to localStorage)
     } catch (e) { console.warn('camera enumeration failed:', e); }
 
     ensureCanvases();
