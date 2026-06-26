@@ -83,7 +83,9 @@
     }
     #cam-video {
       width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block;
-      transform: rotate(180deg); /* phone placed over tray; 180° corrects orientation, matching phoneui-direct.html */
+      /* No transform here: the body rotates 180° in right-side-up (face-down) mode, which
+         naturally inverts the preview for the user. Adding another 180° here would cancel
+         that and make the preview appear right-side up, which is not useful. */
     }
     #preview-overlay {
       position: absolute; inset: 0;
@@ -317,7 +319,7 @@
   // Rotating a child wrapper div breaks touch event coordinates on Android Chrome.
   (function () {
     var saved = localStorage.getItem('rs_page_rotated');
-    var rotated = saved === null ? true : saved === '1';
+    var rotated = saved === null ? false : saved === '1';
     if (rotated) {
       document.body.style.transform = 'rotate(180deg)';
       document.body.style.transformOrigin = 'center center';
@@ -482,8 +484,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = 'bad40a4';
-  var BUILD_TIME     = '2026-06-26 14:07 UTC';
+  var GIT_COMMIT     = '4767d4e';
+  var BUILD_TIME     = '2026-06-26 14:21 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
