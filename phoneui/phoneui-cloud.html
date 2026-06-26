@@ -512,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '7dcf00c';
-  var BUILD_TIME     = '2026-06-26 18:34 UTC';
+  var GIT_COMMIT     = '5771632';
+  var BUILD_TIME     = '2026-06-26 19:24 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -629,25 +629,39 @@
     cameraFace.textContent = (opt && opt.textContent) ? opt.textContent : 'Default rear camera';
   }
 
-  // Show the no-torch warning banner when the active camera lacks a torch but
-  // at least one other camera has one.  Hidden before Start is pressed.
+  // Show the no-torch warning banner when the active camera lacks a torch.
+  // Show Switch whenever there is another camera available — on Android the cold
+  // probe often fails (can't open streams while one is active), so torchIds may
+  // be empty even though other cameras have a torch.  Let the user try.
   function updateNoTorchBanner() {
     if (!noTorchBanner || !cameraStarted) return;
     var activeHasTorch = RsCameraSelector.hasTorchCapability(videoTrack);
-    noTorchBanner.style.display = activeHasTorch ? 'none' : '';
-    // Show Switch only if there is a torch-capable camera OTHER than the active one.
+    // Update torchIds with what the warm active track reports.
     var _aid = RsCameraSelector.deviceIdFromTrack(videoTrack) || currentDeviceId || '';
-    var _hasAlt = Array.from(torchIds).some(function(id) { return id !== _aid; });
-    if (noTorchSwitchBtn) noTorchSwitchBtn.style.display = _hasAlt ? '' : 'none';
+    if (_aid) {
+      if (activeHasTorch) torchIds.add(_aid);
+      else torchIds.delete(_aid);
+    }
+    noTorchBanner.style.display = activeHasTorch ? 'none' : '';
+    // Show Switch if there is any other camera option in the selector.
+    var _hasOtherCam = Array.from(cameraSelect.options).some(function(o) { return o.value && o.value !== _aid; });
+    if (noTorchSwitchBtn) noTorchSwitchBtn.style.display = _hasOtherCam ? '' : 'none';
   }
 
   if (noTorchSwitchBtn) {
     noTorchSwitchBtn.addEventListener('click', async function () {
-      // Pick the first torch-capable camera that appears in the selector
+      var _aid = RsCameraSelector.deviceIdFromTrack(videoTrack) || currentDeviceId || '';
       var targetId = null;
+      // Prefer a known torch-capable camera; fall back to any other camera.
       for (var i = 0; i < cameraSelect.options.length; i++) {
         var v = cameraSelect.options[i].value;
-        if (v && torchIds.has(v)) { targetId = v; break; }
+        if (v && v !== _aid && torchIds.has(v)) { targetId = v; break; }
+      }
+      if (!targetId) {
+        for (var i = 0; i < cameraSelect.options.length; i++) {
+          var v = cameraSelect.options[i].value;
+          if (v && v !== _aid) { targetId = v; break; }
+        }
       }
       if (!targetId) return;
       cameraSelect.value = targetId;
@@ -655,6 +669,10 @@
       torchEnabled = false; refreshTorchBtn();
       try { await openCamera(targetId); }
       catch (err) { showError('Camera switch failed', err.message || String(err)); return; }
+      // After switching, re-populate picker with updated torch info from warm track.
+      await populateCameras(targetId, Array.from(cameraSelect.options).slice(1).map(function(o) {
+        return { deviceId: o.value, label: o.textContent.replace(/\s*🔦$/, '').trim() };
+      }), torchIds);
       _sendCamLabel();
       updateNoTorchBanner();
     });
@@ -737,7 +755,13 @@
     torchEnabled = false; refreshTorchBtn();
     try { await openCamera(newId); }
     catch (err) { showError('Camera switch failed', err.message || String(err)); }
+    // Update torchIds from warm track now that the new camera is open.
     updateNoTorchBanner();
+    // Re-populate picker so the 🔦 icon appears on the newly-confirmed torch camera.
+    var _fvids = Array.from(cameraSelect.options).filter(function(o) { return o.value; }).map(function(o) {
+      return { deviceId: o.value, label: o.textContent.replace(/\s*🔦$/, '').trim() };
+    });
+    await populateCameras(newId || '', _fvids, torchIds);
     _sendCamLabel();  // report new camera label to Companion
   });
 
