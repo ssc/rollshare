@@ -512,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '5771632';
-  var BUILD_TIME     = '2026-06-26 19:31 UTC';
+  var GIT_COMMIT     = '2069a8b';
+  var BUILD_TIME     = '2026-06-26 20:10 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -643,8 +643,10 @@
       else torchIds.delete(_aid);
     }
     noTorchBanner.style.display = activeHasTorch ? 'none' : '';
-    // Show Switch if there is any other camera option in the selector.
-    var _hasOtherCam = Array.from(cameraSelect.options).some(function(o) { return o.value && o.value !== _aid; });
+    // Show Switch only on iOS (Android cold-probe can't reliably identify which
+    // camera has a torch while the stream is active, so the button picks poorly).
+    var _hasOtherCam = !IS_IOS ? false :
+      Array.from(cameraSelect.options).some(function(o) { return o.value && o.value !== _aid; });
     if (noTorchSwitchBtn) noTorchSwitchBtn.style.display = _hasOtherCam ? '' : 'none';
   }
 
@@ -652,11 +654,30 @@
     noTorchSwitchBtn.addEventListener('click', async function () {
       var _aid = RsCameraSelector.deviceIdFromTrack(videoTrack) || currentDeviceId || '';
       var targetId = null;
-      // Prefer a known torch-capable camera; fall back to any other camera.
+      function _isRearLabel(lbl) {
+        var l = (lbl || '').toLowerCase();
+        return l.includes('back') || l.includes('rear') || l.includes('environment') || l.includes('main');
+      }
+      // Pass 1: known torch-capable rear camera.
       for (var i = 0; i < cameraSelect.options.length; i++) {
         var v = cameraSelect.options[i].value;
-        if (v && v !== _aid && torchIds.has(v)) { targetId = v; break; }
+        if (v && v !== _aid && torchIds.has(v) && _isRearLabel(cameraSelect.options[i].textContent)) { targetId = v; break; }
       }
+      // Pass 2: any known torch-capable camera.
+      if (!targetId) {
+        for (var i = 0; i < cameraSelect.options.length; i++) {
+          var v = cameraSelect.options[i].value;
+          if (v && v !== _aid && torchIds.has(v)) { targetId = v; break; }
+        }
+      }
+      // Pass 3: rear-sounding camera even if not in torchIds (Android cold-probe bypass).
+      if (!targetId) {
+        for (var i = 0; i < cameraSelect.options.length; i++) {
+          var v = cameraSelect.options[i].value;
+          if (v && v !== _aid && _isRearLabel(cameraSelect.options[i].textContent)) { targetId = v; break; }
+        }
+      }
+      // Pass 4: any other camera (last resort).
       if (!targetId) {
         for (var i = 0; i < cameraSelect.options.length; i++) {
           var v = cameraSelect.options[i].value;
