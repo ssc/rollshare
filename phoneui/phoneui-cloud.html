@@ -512,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = 'f1ae537';
-  var BUILD_TIME     = '2026-06-26 18:08 UTC';
+  var GIT_COMMIT     = '306cb10';
+  var BUILD_TIME     = '2026-06-26 18:18 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -771,7 +771,7 @@
             var companionLeft = left.some(function (p) { return p.user === 'companion'; });
             if (companionLeft) {
               dbg('companion presence leave', 'warn');
-              _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Rescan the QR code to reconnect.');
+              _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
             }
           })
           .on('presence', { event: 'join' }, function (payload) {
