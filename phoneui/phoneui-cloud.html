@@ -161,6 +161,22 @@
     #torch-btn.on { background: #292910; border-color: #6a6a10; color: #facc15; }
     #torch-btn:disabled { opacity: 0.4; cursor: default; }
 
+    /* no-torch warning banner */
+    #no-torch-banner {
+      background: #1f1000; border: 1px solid #92400e; border-radius: 8px;
+      padding: 0.48rem 0.7rem;
+      display: flex; align-items: center; gap: 0.55rem;
+      font-size: 0.81rem; color: #fcd34d; line-height: 1.4;
+    }
+    #no-torch-banner span { flex: 1; }
+    #no-torch-switch-btn {
+      flex-shrink: 0; padding: 0.3rem 0.65rem;
+      background: #78350f; border: 1px solid #92400e; border-radius: 6px;
+      color: #fcd34d; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      white-space: nowrap;
+    }
+    #no-torch-switch-btn:hover { background: #92400e; }
+
     #start-btn {
       flex: 1; padding: 0.62rem 1rem;
       background: #16a34a; color: #f0faf4;
@@ -363,6 +379,10 @@
     <div id="camera-select-face">Default rear camera</div>
     <select id="cameraSelect" aria-label="Select camera"></select>
   </div>
+  <div id="no-torch-banner" style="display:none" role="alert">
+    <span>⚠️ No flashlight on this camera — lighting may be poor for dice reads</span>
+    <button id="no-torch-switch-btn">Switch ↗</button>
+  </div>
   <div id="action-row">
     <button id="torch-btn" title="Toggle torch">🔦 Torch</button>
     <button id="start-btn">Start Camera</button>
@@ -462,8 +482,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.91';
-  var GIT_COMMIT     = '30dccaf';
-  var BUILD_TIME     = '2026-06-26 00:56 UTC';
+  var GIT_COMMIT     = '67989f2';
+  var BUILD_TIME     = '2026-06-26 05:55 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -535,6 +555,8 @@
   var torchIds        = new Set();
   var currentDeviceId = null;
   var cameraStarted   = false;
+  var noTorchBanner   = document.getElementById('no-torch-banner');
+  var noTorchSwitchBtn = document.getElementById('no-torch-switch-btn');
   var frameSeq        = 0;
   var lastMotionFrame = 0;
   var settleFired     = false;
@@ -576,6 +598,33 @@
   function syncFace() {
     var opt = cameraSelect.options[cameraSelect.selectedIndex];
     cameraFace.textContent = (opt && opt.textContent) ? opt.textContent : 'Default rear camera';
+  }
+
+  // Show the no-torch warning banner when the active camera lacks a torch but
+  // at least one other camera has one.  Hidden before Start is pressed.
+  function updateNoTorchBanner() {
+    if (!noTorchBanner || !cameraStarted) return;
+    var activeId = currentDeviceId || cameraSelect.value || '';
+    noTorchBanner.style.display = (torchIds.size > 0 && !torchIds.has(activeId)) ? '' : 'none';
+  }
+
+  if (noTorchSwitchBtn) {
+    noTorchSwitchBtn.addEventListener('click', async function () {
+      // Pick the first torch-capable camera that appears in the selector
+      var targetId = null;
+      for (var i = 0; i < cameraSelect.options.length; i++) {
+        var v = cameraSelect.options[i].value;
+        if (v && torchIds.has(v)) { targetId = v; break; }
+      }
+      if (!targetId) return;
+      cameraSelect.value = targetId;
+      syncFace();
+      torchEnabled = false; refreshTorchBtn();
+      try { await openCamera(targetId); }
+      catch (err) { showError('Camera switch failed', err.message || String(err)); return; }
+      _sendCamLabel();
+      updateNoTorchBanner();
+    });
   }
 
   function _sendCamLabel() {
@@ -645,6 +694,7 @@
     torchEnabled = false; refreshTorchBtn();
     try { await openCamera(newId); }
     catch (err) { showError('Camera switch failed', err.message || String(err)); }
+    updateNoTorchBanner();
     _sendCamLabel();  // report new camera label to Companion
   });
 
@@ -1144,6 +1194,7 @@
       }
       if (torchIds.size) await populateCameras(activeId, fvids, torchIds);
       _sendCamLabel();  // report active camera label to Companion
+      updateNoTorchBanner();
     } catch (e) { console.warn('camera enumeration failed:', e); }
 
     ensureCanvases();
