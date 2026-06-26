@@ -409,7 +409,7 @@
   </div>
   <div id="no-torch-banner" style="display:none" role="alert">
     <span>⚠️ No flashlight on this camera — lighting may be poor for dice reads</span>
-    <button id="no-torch-switch-btn">Switch ↗</button>
+    <button id="no-torch-switch-btn" style="display:none">Switch ↗</button>
   </div>
   <div id="action-row">
     <button id="torch-btn" title="Toggle torch">🔦 Torch</button>
@@ -512,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '8031e4f';
-  var BUILD_TIME     = '2026-06-26 17:31 UTC';
+  var GIT_COMMIT     = '75d4ea3';
+  var BUILD_TIME     = '2026-06-26 18:02 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -796,6 +796,22 @@
                   ts: Date.now(),
                 },
               }).catch(function () {});
+              // Auto-restart the camera so the user gets a live feed immediately.
+              if (!cameraStarted) {
+                setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+              }
+            }
+            // [e] Another phone tab joined (user rescanned QR in a new tab) — this tab
+            // is now stale. Stop the zombie countdown and tell the user to close this tab.
+            var phoneJoined = joined.some(function (p) { return p.user === 'phone'; });
+            if (phoneJoined && document.getElementById('zombie-overlay')) {
+              dbg('new phone tab joined — this tab is superseded');
+              if (_zombieTimerId !== null) { clearTimeout(_zombieTimerId); _zombieTimerId = null; }
+              var _cdEl = document.getElementById('zombie-countdown');
+              if (_cdEl) {
+                _cdEl.textContent = 'Session resumed in a new scan \u2014 you can close this tab.';
+                _cdEl.style.color = '#aaa';
+              }
             }
           })
           .on('broadcast', { event: 'shutdown' }, function () {
@@ -852,6 +868,8 @@
     cameraStarted = false;
     startBtn.textContent = 'Start Camera';
     startBtn.disabled = false;
+    // Note: startBtn.style.display stays hidden — click() works on hidden buttons.
+    // We restore it only in error paths so the user can manually retry.
     if (frameTimerId !== null) { clearInterval(frameTimerId); frameTimerId = null; }
     if (torchEnabled) {
       torchEnabled = false;
@@ -878,7 +896,7 @@
     d.innerHTML = '<div style="font-size:2.5rem">\u26a0\ufe0f</div>'
       + '<div style="font-weight:700;font-size:1.1rem">' + title + '</div>'
       + '<div style="font-size:0.88rem;color:#ccc">' + msg + '</div>'
-      + '<div id="zombie-countdown" style="font-size:0.8rem;color:#888;margin-top:0.5rem">Waiting for reconnect\u2026 10:00</div>';
+      + '<div id="zombie-countdown" style="font-size:0.8rem;color:#888;margin-top:0.5rem">Trying to reconnect\u2026 10:00</div>';
     document.body.appendChild(d);
     var remaining = 600;
     function _tick() {
@@ -892,7 +910,7 @@
       }
       var m = Math.floor(remaining / 60);
       var s = remaining % 60;
-      el.textContent = 'Waiting for reconnect\u2026 ' + m + ':' + (s < 10 ? '0' : '') + s;
+      el.textContent = 'Trying to reconnect\u2026 ' + m + ':' + (s < 10 ? '0' : '') + s;
       _zombieTimerId = setTimeout(_tick, 1000);
     }
     _zombieTimerId = setTimeout(_tick, 1000);
