@@ -155,7 +155,7 @@
     #cameraSelect { display: none; }
     #cam-picker-panel {
       display: none; flex-direction: column;
-      position: absolute; bottom: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 200;
       background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
       overflow: hidden;
     }
@@ -512,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '0af2e94';
-  var BUILD_TIME     = '2026-06-26 17:11 UTC';
+  var GIT_COMMIT     = '8031e4f';
+  var BUILD_TIME     = '2026-06-26 17:31 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -632,8 +632,10 @@
   // at least one other camera has one.  Hidden before Start is pressed.
   function updateNoTorchBanner() {
     if (!noTorchBanner || !cameraStarted) return;
-    var activeId = currentDeviceId || cameraSelect.value || '';
-    noTorchBanner.style.display = (torchIds.size > 0 && !torchIds.has(activeId)) ? '' : 'none';
+    var activeHasTorch = RsCameraSelector.hasTorchCapability(videoTrack);
+    noTorchBanner.style.display = activeHasTorch ? 'none' : '';
+    // Only show the "Switch" button if there's an alternative torch-capable camera
+    if (noTorchSwitchBtn) noTorchSwitchBtn.style.display = (torchIds.size > 0) ? '' : 'none';
   }
 
   if (noTorchSwitchBtn) {
@@ -768,6 +770,32 @@
             if (companionLeft) {
               dbg('companion presence leave', 'warn');
               _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Rescan the QR code to reconnect.');
+            }
+          })
+          .on('presence', { event: 'join' }, function (payload) {
+            // Companion restarted and rejoined the same channel — dismiss zombie if showing.
+            var joined = (payload && payload.newPresences) || [];
+            var companionJoined = joined.some(function (p) { return p.user === 'companion'; });
+            if (companionJoined && document.getElementById('zombie-overlay')) {
+              dbg('companion presence join — dismissing zombie overlay');
+              _dismissZombieOverlay();
+              // Re-track phone presence (companion may have missed our previous track).
+              broadcastChannel.track({ user: 'phone' });
+              // Re-send hello so companion registers us as connected.
+              broadcastChannel.send({
+                type: 'broadcast', event: 'hello',
+                payload: {
+                  type: 'hello',
+                  app_version: APP_VERSION,
+                  build_time: BUILD_TIME,
+                  ua: navigator.userAgent,
+                  platform: navigator.platform || '',
+                  screen: screen.width + 'x' + screen.height,
+                  dpr: window.devicePixelRatio || 1,
+                  tz: (Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '') || '',
+                  ts: Date.now(),
+                },
+              }).catch(function () {});
             }
           })
           .on('broadcast', { event: 'shutdown' }, function () {
