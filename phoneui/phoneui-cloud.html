@@ -512,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '2069a8b';
-  var BUILD_TIME     = '2026-06-26 20:10 UTC';
+  var GIT_COMMIT     = 'cb6e6f1';
+  var BUILD_TIME     = '2026-06-26 20:22 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -860,6 +860,29 @@
               if (_cdEl) {
                 _cdEl.textContent = 'Session resumed in a new scan \u2014 you can close this tab.';
                 _cdEl.style.color = '#aaa';
+              }
+            }
+          })
+          .on('broadcast', { event: 'companion_hello' }, function (payload) {
+            // Companion just joined (or restarted). Check whether it is running a newer
+            // build than this page. If so, force-reload to pick up the latest phoneui-cloud.html.
+            // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
+            var bcast = (payload && payload.payload) || payload || {};
+            var theirVer = (bcast.app_version || '').replace(/^v/, '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.92', '');
+            dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
+            if (myVer && theirVer && myVer !== theirVer) {
+              // Parse x.y.z tuples; treat parse failure as no-reload.
+              var _parseVer = function(s) { var p = s.split('.').map(Number); return p.length === 3 && p.every(isFinite) ? p : null; };
+              var mv = _parseVer(myVer), tv = _parseVer(theirVer);
+              var companionIsNewer = tv && mv && (
+                tv[0] > mv[0] || (tv[0] === mv[0] && tv[1] > mv[1]) ||
+                (tv[0] === mv[0] && tv[1] === mv[1] && tv[2] > mv[2])
+              );
+              if (companionIsNewer) {
+                dbg('companion is newer (' + theirVer + ' > ' + myVer + ') — reloading', 'warn');
+                setStatus('🔄', 'App updated', 'Reloading to get the latest version…');
+                setTimeout(function () { window.location.reload(true); }, 1200);
               }
             }
           })
