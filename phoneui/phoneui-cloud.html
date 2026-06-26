@@ -481,9 +481,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = '1.0.91';
-  var GIT_COMMIT     = '67989f2';
-  var BUILD_TIME     = '2026-06-26 05:55 UTC';
+  var APP_VERSION    = '1.0.92';
+  var GIT_COMMIT     = 'bad40a4';
+  var BUILD_TIME     = '2026-06-26 14:07 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -546,9 +546,6 @@
   var motionDetector  = new MotionDetector();
   var supabase        = null;
   var broadcastChannel = null;   // Supabase Realtime broadcast channel
-  var lastHeartbeatTs  = 0;      // epoch ms of last Companion heartbeat received
-  var heartbeatWatchId = null;   // setInterval id for zombie detection
-  var _hbRxCount       = 0;      // heartbeats received from Companion this session
   var currentStream   = null;
   var videoTrack      = null;
   var torchEnabled    = false;
@@ -720,30 +717,17 @@
             dbg('anon sign-in ok uid=' + (res.data && res.data.user ? res.data.user.id.slice(-6) : '?'));
           }
         });
-        // Subscribe to Companion heartbeat / shutdown broadcasts
+        // Subscribe to Companion shutdown broadcasts and presence disconnect
         dbg('subscribing to broadcast channel cloud:' + rendezvousKey.slice(-6));
         broadcastChannel = supabase
           .channel('cloud:' + rendezvousKey)
-          .on('broadcast', { event: 'heartbeat' }, function () {
-            lastHeartbeatTs = Date.now();
-            _hbRxCount++;
-            if (broadcastChannel) {
-              var _ackOpt = cameraSelect.options[cameraSelect.selectedIndex];
-              var _ackLabel = (_ackOpt && _ackOpt.value) ? (_ackOpt.textContent || '').replace(/\s*🔦$/, '').trim() : '';
-              broadcastChannel.send({
-                type: 'broadcast', event: 'broadcast',
-                payload: {
-                  type: 'hb_ack',
-                  count: _hbRxCount,
-                  build_time: BUILD_TIME,
-                  git_commit: GIT_COMMIT,
-                  cam_label: _ackLabel,
-                },
-              }).catch(function() {});
+          .on('presence', { event: 'leave' }, function (payload) {
+            var left = (payload && payload.leftPresences) || [];
+            var companionLeft = left.some(function (p) { return p.user === 'companion'; });
+            if (companionLeft) {
+              dbg('companion presence leave', 'warn');
+              _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Rescan the QR code to reconnect.');
             }
-            // Clear zombie overlay if it was showing
-            var zEl = document.getElementById('zombie-overlay');
-            if (zEl) zEl.remove();
           })
           .on('broadcast', { event: 'shutdown' }, function () {
             dbg('shutdown rx', 'warn');
@@ -752,6 +736,8 @@
           .subscribe(function (status) {
             dbg('broadcast channel status: ' + status);
             if (status === 'SUBSCRIBED') {
+              // Track phone presence so Companion can also see subscriber count
+              broadcastChannel.track({ user: 'phone' });
               // Send hello so Companion can confirm bidirectional comms and log device info
               broadcastChannel.send({
                 type: 'broadcast', event: 'hello',
@@ -784,13 +770,6 @@
               }
             }
           });
-        // Zombie watchdog: if no heartbeat for 35s after camera started, warn
-        heartbeatWatchId = setInterval(function () {
-          if (!cameraStarted || lastHeartbeatTs === 0) return;
-          if (Date.now() - lastHeartbeatTs > 35000) {
-            _showZombieOverlay('Companion not responding', 'No heartbeat received. The RollShare app may have closed.');
-          }
-        }, 15000);
         return true;
       }
     } catch (_) {}
@@ -1220,7 +1199,7 @@
   // Stamp version into status bar (always, not just when autostart)
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== '1.0.91') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== '1.0.92') v.textContent = 'v' + APP_VERSION;
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');

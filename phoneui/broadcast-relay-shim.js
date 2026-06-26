@@ -26,10 +26,10 @@
  * every frame the phone sends.
  *
  * Heartbeat simulation:
- *   If no real Companion is connected the phone's zombie detector will fire.
- *   The shim starts a fake heartbeat interval (SHIM_HEARTBEAT_INTERVAL_MS) so
- *   the phone page stays alive during pure-UI iteration without a Companion.
- *   Set window.ROLLSHARE_SHIM_FAKE_HEARTBEAT = false to disable.
+ *   Previously the shim ran a fake heartbeat interval so the phone's zombie
+ *   watchdog wouldn't fire in pure-UI dev iteration.  Zombie detection is now
+ *   presence-based (Companion tracks itself; phone listens for presence_diff/leave),
+ *   so no fake heartbeat is needed.  The shim stubs channel.track() as a no-op.
  */
 (function () {
   "use strict";
@@ -37,15 +37,11 @@
   var RELAY_URL = (window.ROLLSHARE_RELAY_URL) ||
                   "ws://localhost:8080/devmode/broadcast-relay";
 
-  var FAKE_HEARTBEAT = (window.ROLLSHARE_SHIM_FAKE_HEARTBEAT !== false);
-  var HEARTBEAT_INTERVAL_MS = 14000;  // slightly under typical 15s zombie timeout
-
   // ── One WS connection per channel name ───────────────────────────────────
   function _makeChannel(channelName) {
     var _handlers = {};      // event name → [handler, ...]
     var _ws = null;
     var _subCallback = null;
-    var _hbTimer = null;
     var _ref = 0;
     var _topic = "realtime:" + channelName;
 
@@ -81,7 +77,6 @@
           if (status === "ok" && onReady) {
             onReady();
             onReady = null;
-            if (FAKE_HEARTBEAT) { _startFakeHeartbeat(); }
           }
           return;
         }
@@ -102,20 +97,8 @@
       };
 
       _ws.onclose = function () {
-        _stopFakeHeartbeat();
         if (_subCallback) { _subCallback("CLOSED"); }
       };
-    }
-
-    function _startFakeHeartbeat() {
-      _stopFakeHeartbeat();
-      _hbTimer = setInterval(function () {
-        _triggerHandlers("heartbeat", {});
-      }, HEARTBEAT_INTERVAL_MS);
-    }
-
-    function _stopFakeHeartbeat() {
-      if (_hbTimer) { clearInterval(_hbTimer); _hbTimer = null; }
     }
 
     var _channel = {
@@ -148,8 +131,14 @@
         return Promise.resolve({ status: "ok" });
       },
 
+      track: function (state) {
+        // Presence track is a no-op in the relay shim — the relay doesn't
+        // implement the Phoenix Presence protocol.  Zombie detection via
+        // presence_diff/leave won't fire in devmode without a real Companion.
+        return Promise.resolve({ status: "ok" });
+      },
+
       unsubscribe: function () {
-        _stopFakeHeartbeat();
         if (_ws) {
           try {
             _ws.send(JSON.stringify({ event: "phx_leave", topic: _topic, payload: {}, ref: _nextRef() }));
@@ -211,6 +200,5 @@
   // Also cover the alternate import path the page checks
   window.supabaseJs = { createClient: _createClient };
 
-  console.log("[shim] broadcast_relay_shim active → relay:", RELAY_URL,
-              "| fake heartbeat:", FAKE_HEARTBEAT);
+  console.log("[shim] broadcast_relay_shim active → relay:", RELAY_URL);
 })();
