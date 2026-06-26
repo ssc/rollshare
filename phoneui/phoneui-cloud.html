@@ -84,8 +84,8 @@
     #cam-video {
       width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block;
     }
-    /* When the page is inverted (face-down mode), counter-rotate the video so
-       the preview appears right-side up from the viewer's perspective. */
+    /* In inverted (face-down) mode the body is rotated 180°; counter-rotate the
+       video so the preview appears right-side up to the viewer. */
     body.page-inverted #cam-video {
       transform: rotate(180deg);
     }
@@ -257,8 +257,8 @@
       flex: 1; display: flex; flex-direction: column; justify-content: center;
       align-items: stretch; width: 100%;
     }
-    #bottom-tray { width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; padding: 5px 1rem 5px; flex-shrink: 0; }
-    #rotate-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.5rem; cursor: pointer; position: relative; overflow: hidden; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    #bottom-tray { width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; padding: 10px 1rem; flex-shrink: 0; }
+    #rotate-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode floating button — right side of bottom tray */
     #devmode-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #f97316; background: rgba(30,20,10,0.85); color: #f97316; font-size: 1.4rem; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode overlay panel */
@@ -413,7 +413,7 @@
         document.body.classList.add('page-inverted');
         localStorage.setItem('rs_page_rotated', '1');
     }
-})()"><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(90deg)">↷</span></button>
+  })()">&#8635;</button>
   <!-- devmode toggle: shown by IIFE when ?dev=1; harmless hidden button on production -->
   <button id="devmode-toggle-btn" title="Toggle dev panel">⚙</button>
 </div>
@@ -489,8 +489,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '79b3e3d';
-  var BUILD_TIME     = '2026-06-26 14:29 UTC';
+  var GIT_COMMIT     = '5939387';
+  var BUILD_TIME     = '2026-06-26 14:39 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
