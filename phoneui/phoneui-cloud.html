@@ -91,6 +91,7 @@
     body.page-inverted #cam-video {
       transform: rotate(180deg);
     }
+
     #preview-overlay {
       position: absolute; inset: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -115,7 +116,7 @@
       background: #111c17; border: 1px solid #1f3d2d; border-radius: 0 0 10px 10px;
       padding: 0.3rem 0.75rem;
       display: flex; align-items: center; gap: 0.4rem;
-      margin: 0 auto 0.6rem;
+      margin: 0 auto 8px;
     }
     #status-icon { font-size: 0.85rem; flex-shrink: 0; }
     #status-text { font-size: 0.72rem; font-weight: 600; color: #86efac; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -144,16 +145,29 @@
       background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
       color: #ccc; font-size: 0.84rem; text-align: left; user-select: none;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer;
     }
     #camera-select-face::after {
       content: "▾";
       position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%);
       color: #555; pointer-events: none;
     }
-    #cameraSelect {
-      position: absolute; inset: 0; opacity: 0;
-      width: 100%; height: 100%; cursor: pointer;
+    #cameraSelect { display: none; }
+    #cam-picker-panel {
+      display: none; flex-direction: column;
+      position: absolute; bottom: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+      background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
+      overflow: hidden;
     }
+    #cam-picker-panel.open { display: flex; }
+    .cam-picker-option {
+      width: 100%; padding: 0.6rem 0.7rem; text-align: left;
+      background: none; border: none; border-bottom: 1px solid #2e2e50;
+      color: #ccc; font-size: 0.84rem; cursor: pointer; font-family: inherit;
+    }
+    .cam-picker-option:last-child { border-bottom: none; }
+    .cam-picker-option.selected { color: #86efac; background: #0d1a12; }
+    .cam-picker-option:hover { background: #22224e; }
 
     /* torch + start row */
     #action-row { display: flex; gap: 0.45rem; }
@@ -391,6 +405,7 @@
   <div id="camera-select-wrap">
     <div id="camera-select-face">Default rear camera</div>
     <select id="cameraSelect" aria-label="Select camera"></select>
+    <div id="cam-picker-panel"></div>
   </div>
   <div id="no-torch-banner" style="display:none" role="alert">
     <span>⚠️ No flashlight on this camera — lighting may be poor for dice reads</span>
@@ -497,8 +512,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '12d47fb';
-  var BUILD_TIME     = '2026-06-26 16:51 UTC';
+  var GIT_COMMIT     = '0af2e94';
+  var BUILD_TIME     = '2026-06-26 17:11 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -552,6 +567,7 @@
   var torchBtn        = document.getElementById('torch-btn');
   var cameraSelect    = document.getElementById('cameraSelect');
   var cameraFace      = document.getElementById('camera-select-face');
+  var camPickerPanel  = document.getElementById('cam-picker-panel');
   var errorBanner     = document.getElementById('error-banner');
   var errorTitle      = document.getElementById('error-title');
   var errorMsg        = document.getElementById('error-msg');
@@ -653,7 +669,17 @@
   async function populateCameras(selectedId, inputs, tIds) {
     RsCameraSelector.populateSelectEl(cameraSelect, selectedId, inputs, tIds);
     syncFace();
+    RsCameraSelector.populatePickerPanel(camPickerPanel, cameraSelect, cameraFace);
   }
+
+  // Custom picker toggle — face click opens/closes the in-DOM panel
+  cameraFace.addEventListener('click', function(e) {
+    e.stopPropagation();
+    camPickerPanel.classList.toggle('open');
+  });
+  document.addEventListener('click', function() {
+    camPickerPanel.classList.remove('open');
+  });
 
   async function openCamera(deviceId) {
     if (currentStream) { currentStream.getTracks().forEach(function(t) { t.stop(); }); currentStream = null; videoTrack = null; }

@@ -255,12 +255,41 @@ window.RsCameraSelector = (function () {
         }) || null;
     }
 
+    /* Build/refresh camera option buttons in panelEl from selectEl's current options.
+     * Clicking a button updates selectEl.value, fires a 'change' event on selectEl,
+     * updates faceEl text, marks the button selected, and closes the panel.
+     * Call this after populateSelectEl whenever the camera list changes.
+     * Buttons use class 'cam-picker-option'; host page is responsible for CSS. */
+    function populatePickerPanel(panelEl, selectEl, faceEl) {
+        panelEl.innerHTML = '';
+        var opts = Array.from(selectEl.options);
+        opts.forEach(function(opt) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'cam-picker-option' + (opt.value === selectEl.value ? ' selected' : '');
+            btn.textContent = opt.textContent;
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectEl.value = opt.value;
+                faceEl.textContent = opt.textContent;
+                Array.from(panelEl.querySelectorAll('.cam-picker-option')).forEach(function(b) {
+                    b.classList.remove('selected');
+                });
+                btn.classList.add('selected');
+                panelEl.classList.remove('open');
+                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            panelEl.appendChild(btn);
+        });
+    }
+
     return {
         openStreamForDevice:   openStreamForDevice,
         hasTorchCapability:    hasTorchCapability,
         deviceIdFromTrack:     deviceIdFromTrack,
         probeTorchIds:         probeTorchIds,
         populateSelectEl:      populateSelectEl,
+        populatePickerPanel:   populatePickerPanel,
         getPreferredIosCamera: getPreferredIosCamera,
     };
 })();
