@@ -55,7 +55,9 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 0.85rem 0.85rem 0;
+      justify-content: center;
+      padding: 0.85rem;
+      overflow: hidden;
     }
     header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.5rem; text-align: center; }
     header .header-title-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
@@ -251,13 +253,19 @@
 
     #page-rotate-wrapper {
       max-width: 480px; width: 100%; padding: 0 1rem;
-      display: flex; flex-direction: column; flex: 1;
+      display: flex; flex-direction: column;
     }
     #cam-content {
-      flex: 1; display: flex; flex-direction: column; justify-content: center;
+      display: flex; flex-direction: column;
       align-items: stretch; width: 100%;
     }
-    #bottom-tray { width: 100%; max-width: 480px; display: flex; justify-content: space-between; align-items: center; padding: 10px 1rem; flex-shrink: 0; }
+    #bottom-tray { position: fixed; bottom: 0; left: 0; right: 0; z-index: 500; display: flex; justify-content: space-between; align-items: center; padding: 10px 1rem; pointer-events: none; }
+    #bottom-tray > * { pointer-events: auto; }
+    /* In inverted mode the body transform flips the coordinate system, so
+       bottom:0 ends up at the physical top (= user's visual bottom). Switch to
+       top:0 (= physical bottom = user's visual top) and counter-rotate the tray
+       so buttons appear right-side up to the inverted viewer. */
+    body.page-inverted #bottom-tray { bottom: auto; top: 0; transform: rotate(180deg); transform-origin: center center; }
     #rotate-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
     /* devmode floating button — right side of bottom tray */
     #devmode-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #f97316; background: rgba(30,20,10,0.85); color: #f97316; font-size: 1.4rem; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
@@ -273,13 +281,13 @@
 
     /* ── Info overlay ── */
     #info-btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 1.1rem; height: 1.1rem; border-radius: 50%;
-      border: 1px solid #4a8a60; background: transparent;
-      color: #4a8a60; font-size: 0.65rem; font-weight: 700;
-      cursor: pointer; vertical-align: middle; margin-left: 0.3rem;
-      line-height: 1; padding: 0; flex-shrink: 0;
+      display: inline;
+      background: none; border: none; padding: 0;
+      color: #60a5fa; font-size: 0.82rem;
+      text-decoration: underline; text-underline-offset: 2px;
+      cursor: pointer; font-family: inherit;
     }
+    #info-btn:hover { color: #93c5fd; }
     #info-overlay {
       display: none; position: fixed; inset: 0; z-index: 20000;
       background: rgba(0,0,0,0.82);
@@ -337,7 +345,7 @@
     <img src="../assets/rollshare_logo.png" alt="RollShare" />
     <h1>RollShare</h1>
   </div>
-  <p>Point phone down at the dice tray<button id="info-btn" title="How to set up" aria-label="Setup info">i</button></p>
+  <p>Point phone down at the dice tray — <button id="info-btn" title="How to set up" aria-label="Setup info">how to set up?</button></p>
 </header>
 
 <!-- Info overlay -->
@@ -390,7 +398,7 @@
   </div>
   <div id="action-row">
     <button id="torch-btn" title="Toggle torch">🔦 Torch</button>
-    <button id="start-btn">Start Camera</button>
+    <button id="start-btn" style="display:none">Start Camera</button>
   </div>
 </div>
 
@@ -489,8 +497,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.92';
-  var GIT_COMMIT     = '5939387';
-  var BUILD_TIME     = '2026-06-26 14:39 UTC';
+  var GIT_COMMIT     = '12d47fb';
+  var BUILD_TIME     = '2026-06-26 16:51 UTC';
   var params         = new URLSearchParams(window.location.search);
   var rendezvousKey  = params.get('s') || '';
   var isDev          = params.get('dev') === '1';
@@ -743,6 +751,8 @@
           .subscribe(function (status) {
             dbg('broadcast channel status: ' + status);
             if (status === 'SUBSCRIBED') {
+              // If we were in zombie/reconnect state, dismiss the overlay
+              _dismissZombieOverlay();
               // Track phone presence so Companion can also see subscriber count
               broadcastChannel.track({ user: 'phone' });
               // Send hello so Companion can confirm bidirectional comms and log device info
@@ -803,14 +813,41 @@
     dbg('camera released — companion disconnected', 'warn');
   }
 
+  var _zombieTimerId = null;
+
   function _showZombieOverlay(title, msg) {
     if (document.getElementById('zombie-overlay')) return;
     _releaseCamera();
     var d = document.createElement('div');
     d.id = 'zombie-overlay';
     d.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,26,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.7rem;z-index:999;color:#f5b7b1;text-align:center;padding:1.5rem;';
-    d.innerHTML = '<div style="font-size:2.5rem">\u26a0\ufe0f</div><div style="font-weight:700;font-size:1.1rem">' + title + '</div><div style="font-size:0.88rem;color:#ccc">' + msg + '</div>';
+    d.innerHTML = '<div style="font-size:2.5rem">\u26a0\ufe0f</div>'
+      + '<div style="font-weight:700;font-size:1.1rem">' + title + '</div>'
+      + '<div style="font-size:0.88rem;color:#ccc">' + msg + '</div>'
+      + '<div id="zombie-countdown" style="font-size:0.8rem;color:#888;margin-top:0.5rem">Waiting for reconnect\u2026 10:00</div>';
     document.body.appendChild(d);
+    var remaining = 600;
+    function _tick() {
+      remaining--;
+      var el = document.getElementById('zombie-countdown');
+      if (!el) return;
+      if (remaining <= 0) {
+        el.textContent = 'No reconnection \u2014 please rescan the QR code.';
+        el.style.color = '#f5b7b1';
+        return;
+      }
+      var m = Math.floor(remaining / 60);
+      var s = remaining % 60;
+      el.textContent = 'Waiting for reconnect\u2026 ' + m + ':' + (s < 10 ? '0' : '') + s;
+      _zombieTimerId = setTimeout(_tick, 1000);
+    }
+    _zombieTimerId = setTimeout(_tick, 1000);
+  }
+
+  function _dismissZombieOverlay() {
+    if (_zombieTimerId !== null) { clearTimeout(_zombieTimerId); _zombieTimerId = null; }
+    var el = document.getElementById('zombie-overlay');
+    if (el) el.remove();
   }
 
   // ── Canvases ──────────────────────────────────────────────────────────────
@@ -1180,12 +1217,12 @@
       }
       if (torchIds.size) await populateCameras(activeId, fvids, torchIds);
       _sendCamLabel();  // report active camera label to Companion
-      updateNoTorchBanner();
     } catch (e) { console.warn('camera enumeration failed:', e); }
 
     ensureCanvases();
     motionDetector.reset();
     cameraStarted = true;
+    updateNoTorchBanner();
     // Keep status-bar visible in-flow; just hide the controls.
     startBtn.style.display = 'none';
     setStatus('\uD83D\uDC41', 'Watching for motion\u2026', 'Point camera at the dice tray');
@@ -1220,23 +1257,25 @@
     });
   }
 
-  if (!params.get('noautostart')) {
+  if (params.get('noautostart')) {
+    startBtn.style.display = '';  // show for manual start
+  } else {
     var _previewAttempted = false;
     async function _tryOpenPreview() {
       if (_previewAttempted || currentStream || cameraStarted) return;
       _previewAttempted = true;
       try {
         await openCamera(null);
-        // Preview live — hide start button and auto-start motion loop.
-        // No gesture needed on Android/desktop so we can click programmatically.
-        startBtn.style.display = 'none';
+        // Preview live — auto-start motion loop (button stays hidden).
         startBtn.click();
       } catch(err) {
         if (err.name === 'NotAllowedError') {
           // iOS Safari: needs a real gesture before getUserMedia
           if (_tapOverlay) _tapOverlay.classList.add('show');
+        } else {
+          // Other errors: surface the button so user can retry manually
+          startBtn.style.display = '';
         }
-        // Other errors: leave preview-overlay + start button visible
       }
     }
     setTimeout(_tryOpenPreview, 400);
