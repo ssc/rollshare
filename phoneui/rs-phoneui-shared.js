@@ -16,7 +16,7 @@
  *   .getCaptureStream(video) → MediaStream | null   (wraps video.captureStream or canvas fallback)
  *   .stopCaptureStream()     → void
  */
-window.RS_JS_BUILD_TIME = '2026-06-29 23:03 UTC';
+window.RS_JS_BUILD_TIME = '2026-06-29 23:21 UTC';
 
 window.RsDevGenerators = (function () {
     'use strict';
