@@ -570,8 +570,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = 'b648e47';
-  var BUILD_TIME     = '2026-06-30 01:49 UTC';
+  var GIT_COMMIT     = 'b4d0a38';
+  var BUILD_TIME     = '2026-06-30 01:59 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -999,14 +999,17 @@
             var joined = (payload && payload.newPresences) || [];
             var companionJoined = joined.some(function (p) { return p.user === 'companion'; });
             if (companionJoined) {
-              // Always re-track and re-send hello when companion joins/rejoins.
-              // This covers the race where companion subscribes after the phone already
-              // sent its initial hello (e.g. friend private channel handoff).
+              // Re-track and re-send hello when companion joins/rejoins.
+              // On the broker channel, only re-send if we haven't been assigned yet AND
+              // this is a rejoin (zombie recovery) — not on first join since SUBSCRIBED
+              // already sent friend_hello. On the private channel always re-send.
               broadcastChannel.track({ user: 'phone' });
-              broadcastChannel.send({
-                type: 'broadcast', event: _helloEventName(),
-                payload: _helloPayload(),
-              }).catch(function () {});
+              if (friendAssigned || document.getElementById('zombie-overlay')) {
+                broadcastChannel.send({
+                  type: 'broadcast', event: _helloEventName(),
+                  payload: _helloPayload(),
+                }).catch(function () {});
+              }
               if (document.getElementById('zombie-overlay')) {
                 dbg('companion presence join — dismissing zombie overlay');
                 _dismissZombieOverlay();
@@ -1039,8 +1042,11 @@
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
             var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.94', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
-            // Re-send hello in case our initial send was missed (e.g. friend private channel race).
-            if (broadcastChannel) {
+            // Re-send hello only on the private channel (friendAssigned) to handle the
+            // Python connection race. Do NOT re-send friend_hello on the broker channel
+            // — the SUBSCRIBED handler already sent it, and re-sending creates duplicate
+            // breakout channels.
+            if (broadcastChannel && friendAssigned) {
               broadcastChannel.send({
                 type: 'broadcast', event: _helloEventName(),
                 payload: _helloPayload(),
