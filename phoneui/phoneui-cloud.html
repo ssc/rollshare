@@ -570,8 +570,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = '6836569';
-  var BUILD_TIME     = '2026-06-30 01:07 UTC';
+  var GIT_COMMIT     = '6a2e95d';
+  var BUILD_TIME     = '2026-06-30 01:28 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -998,19 +998,24 @@
             // Companion restarted and rejoined the same channel — dismiss zombie if showing.
             var joined = (payload && payload.newPresences) || [];
             var companionJoined = joined.some(function (p) { return p.user === 'companion'; });
-            if (companionJoined && document.getElementById('zombie-overlay')) {
-              dbg('companion presence join — dismissing zombie overlay');
-              _dismissZombieOverlay();
-              // Re-track phone presence (companion may have missed our previous track).
+            if (companionJoined) {
+              // Always re-track and re-send hello when companion joins/rejoins.
+              // This covers the race where companion subscribes after the phone already
+              // sent its initial hello (e.g. friend private channel handoff).
               broadcastChannel.track({ user: 'phone' });
-              // Re-send hello so companion registers us as connected.
               broadcastChannel.send({
                 type: 'broadcast', event: _helloEventName(),
                 payload: _helloPayload(),
               }).catch(function () {});
-              // Auto-restart the camera so the user gets a live feed immediately.
-              if (!cameraStarted) {
-                setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+              if (document.getElementById('zombie-overlay')) {
+                dbg('companion presence join — dismissing zombie overlay');
+                _dismissZombieOverlay();
+                // Auto-restart the camera so the user gets a live feed immediately.
+                if (!cameraStarted) {
+                  setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+                }
+              } else {
+                dbg('companion presence join — re-sent hello');
               }
             }
             // [e] Another phone tab joined (user rescanned QR in a new tab) — this tab
@@ -1034,6 +1039,13 @@
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
             var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.94', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
+            // Re-send hello in case our initial send was missed (e.g. friend private channel race).
+            if (broadcastChannel) {
+              broadcastChannel.send({
+                type: 'broadcast', event: _helloEventName(),
+                payload: _helloPayload(),
+              }).catch(function () {});
+            }
             if (myVer && theirVer && myVer !== theirVer) {
               // Parse x.y.z tuples; treat parse failure as no-reload.
               var _parseVer = function(s) { var p = s.split('.').map(Number); return p.length === 3 && p.every(isFinite) ? p : null; };
