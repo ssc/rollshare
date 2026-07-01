@@ -570,8 +570,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = 'b4d0a38';
-  var BUILD_TIME     = '2026-06-30 02:00 UTC';
+  var GIT_COMMIT     = '4b06dd3';
+  var BUILD_TIME     = '2026-07-01 23:07 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -594,9 +594,13 @@
   var isDev          = params.get('dev') === '1';
   var isShim         = params.get('shim') === '1';  // local relay mode — fake camera allowed
   var isFriendMode   = _isTruthyParam(params.get('friend'));
+  // 'reconnect=1' is set by _switchToFriendPrivateChannel via history.replaceState so
+  // that when iOS kills and reloads the tab, the page knows it was a friend session
+  // and can auto-start the camera and show the correct label without rescanning the QR.
+  var _isFriendReconnect = _isTruthyParam(params.get('reconnect')) && !isFriendMode;
   var friendAssigned = !isFriendMode;
   var friendEphemeralId = 'f' + Math.random().toString(36).slice(2, 12);
-  var friendDisplayName = '';
+  var friendDisplayName = params.get('fname') || '';
 
   if (isFriendMode) {
     var _setFriendHeader = function() {
@@ -703,9 +707,14 @@
   var capCanvas       = null;
 
   // Always show a compact friend marker in the status bar when friend mode is active.
-  if (isFriendMode && sessionChip) {
+  // Also applies to a reloaded reconnect tab (reconnect=1, no friend=1).
+  if ((isFriendMode || _isFriendReconnect) && sessionChip) {
     sessionChip.classList.add('friend-chip');
-    sessionChip.textContent = friendAssigned ? 'Friend Mode' : 'Friend Broker';
+    if (_isFriendReconnect) {
+      sessionChip.textContent = 'Friend …' + activeRendezvousKey.slice(-6);
+    } else {
+      sessionChip.textContent = friendAssigned ? 'Friend Mode' : 'Friend Broker';
+    }
     sessionChip.style.display = '';
   }
 
@@ -752,6 +761,22 @@
       try { supabase.removeChannel(broadcastChannel); } catch (_) {}
     }
     broadcastChannel = null;
+    // Rewrite the URL to the private key so that if iOS kills and reloads this
+    // tab the page comes back on the persistent private channel instead of the
+    // now-stale broker key.  Strip 'friend=1' so the reloaded page treats itself
+    // as a normal (non-broker) connection and sends a plain 'hello' — which the
+    // Companion reconnect listener expects.
+    // Add 'reconnect=1' and 'fname=<name>' so the reloaded page auto-starts the
+    // camera and shows the correct friend label in the session chip.
+    try {
+      var _np = new URLSearchParams(window.location.search || '');
+      _np.set('s', friendKey);
+      _np.delete('friend');
+      _np.set('reconnect', '1');
+      var _fname = (friendName || friendDisplayName || '').trim().slice(0, 64);
+      if (_fname) _np.set('fname', _fname); else _np.delete('fname');
+      history.replaceState(null, '', '?' + _np.toString() + (window.location.hash || ''));
+    } catch (_) {}
     initSupabase(true);
   }
 
@@ -1069,7 +1094,10 @@
           })
           .on('broadcast', { event: 'shutdown' }, function () {
             dbg('shutdown rx', 'warn');
-            _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Rescan the QR code to reconnect.');
+            var _shutdownMsg = (friendAssigned || _isFriendReconnect)
+              ? 'The RollShare app has closed. It will reconnect automatically when it restarts.'
+              : 'The RollShare app has closed. Rescan the QR code to reconnect.';
+            _showZombieOverlay('Companion disconnected', _shutdownMsg);
           })
           .on('broadcast', { event: 'friend_assign' }, function (payload) {
             if (!isFriendMode || friendAssigned) return;
@@ -1109,6 +1137,12 @@
                     dbg('ua_hints model=' + _model);
                   }
                 }).catch(function () {});
+              }
+              // Friend reconnect tab: auto-start the camera so the user doesn't need to
+              // manually tap Start after a tab reload (mirrors zombie overlay auto-start).
+              if (_isFriendReconnect && !cameraStarted) {
+                setStatus('\uD83D\uDD04', 'Reconnecting…', 'Friend session restoring');
+                setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 400);
               }
               // Friend mode: update status to reflect which channel phase we're in, and
               // flush cam_label + geo that were blocked while on the broker channel.
