@@ -570,8 +570,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = '0c7ee99';
-  var BUILD_TIME     = '2026-07-01 23:20 UTC';
+  var GIT_COMMIT     = '8878dd9';
+  var BUILD_TIME     = '2026-07-01 23:41 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -601,6 +601,35 @@
   var friendAssigned = !isFriendMode;
   var friendEphemeralId = 'f' + Math.random().toString(36).slice(2, 12);
   var friendDisplayName = params.get('fname') || '';
+
+  // If arriving on a broker URL (?friend=1) but we previously stored a private key
+  // for this broker key in localStorage, skip the broker entirely and connect directly
+  // to the saved private channel.  This handles the case where the browser restores
+  // the original QR URL instead of the history.replaceState URL.
+  var _LS_FRIEND_KEY_PREFIX = 'rs_friend_pk_';
+  if (isFriendMode && rendezvousKey) {
+    try {
+      var _savedPk = localStorage.getItem(_LS_FRIEND_KEY_PREFIX + rendezvousKey);
+      var _savedPkName = localStorage.getItem(_LS_FRIEND_KEY_PREFIX + rendezvousKey + '_name') || '';
+      if (_savedPk && _savedPk.length >= 10) {
+        // Already been through broker before — go straight to private channel.
+        isFriendMode = false;
+        _isFriendReconnect = true;
+        friendAssigned = true;
+        activeRendezvousKey = _savedPk;
+        friendDisplayName = _savedPkName || friendDisplayName;
+        // Also update the address bar so future reloads skip this lookup.
+        try {
+          var _np2 = new URLSearchParams(window.location.search || '');
+          _np2.set('s', _savedPk);
+          _np2.delete('friend');
+          _np2.set('reconnect', '1');
+          if (_savedPkName) _np2.set('fname', _savedPkName); else _np2.delete('fname');
+          history.replaceState(null, '', '?' + _np2.toString() + (window.location.hash || ''));
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
 
   if (isFriendMode) {
     var _setFriendHeader = function() {
@@ -776,6 +805,16 @@
       var _fname = (friendName || friendDisplayName || '').trim().slice(0, 64);
       if (_fname) _np.set('fname', _fname); else _np.delete('fname');
       history.replaceState(null, '', '?' + _np.toString() + (window.location.hash || ''));
+    } catch (_) {}
+    // Also persist in localStorage keyed by the original broker key so that if the
+    // browser restores the original QR URL on next reload, we still skip the broker.
+    try {
+      var _brokerKey = rendezvousKey; // captured from outer scope at page-load time
+      var _fnameStore = (friendName || friendDisplayName || '').trim().slice(0, 64);
+      if (_brokerKey) {
+        localStorage.setItem(_LS_FRIEND_KEY_PREFIX + _brokerKey, friendKey);
+        localStorage.setItem(_LS_FRIEND_KEY_PREFIX + _brokerKey + '_name', _fnameStore);
+      }
     } catch (_) {}
     initSupabase(true);
   }
@@ -1222,9 +1261,14 @@
     var d = document.createElement('div');
     d.id = 'zombie-overlay';
     d.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,26,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.7rem;z-index:999;color:#f5b7b1;text-align:center;padding:1.5rem;';
+    var _modeLabel = isFriendMode
+      ? (friendAssigned ? 'Friend (private channel)' : 'Friend (broker)')
+      : (_isFriendReconnect ? 'Friend (reconnect)' : 'Primary');
+    var _keyLabel = activeRendezvousKey ? activeRendezvousKey.slice(-8) : '?';
     d.innerHTML = '<div style="font-size:2.5rem">\u26a0\ufe0f</div>'
       + '<div style="font-weight:700;font-size:1.1rem">' + title + '</div>'
       + '<div style="font-size:0.88rem;color:#ccc">' + msg + '</div>'
+      + '<div style="font-size:0.75rem;color:#777;margin-top:0.15rem">mode: ' + _modeLabel + ' &nbsp;&bull;&nbsp; key: \u2026' + _keyLabel + '</div>'
       + '<div id="zombie-countdown" style="font-size:0.8rem;color:#888;margin-top:0.5rem">Trying to reconnect\u2026 10:00</div>';
     document.body.appendChild(d);
     var remaining = 600;
