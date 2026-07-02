@@ -65,6 +65,19 @@
     header h1 { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin: 0; }
     header p  { color: #777; font-size: 1.0rem; margin-top: 0.25rem; }
 
+    #friend-mode-sub {
+      display: none;
+      margin-top: 0.3rem;
+      padding: 0.24rem 0.58rem;
+      border-radius: 999px;
+      border: 1px solid #365f49;
+      background: #14261d;
+      color: #9be6b6;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
     #error-banner {
       display: none;
       background: #3a0a0a; border: 1px solid #c0392b; border-radius: 10px;
@@ -417,6 +430,7 @@
     <h1>RollShare</h1>
   </div>
   <p>Point phone down at the dice tray — <button id="info-btn" title="How to set up" aria-label="Setup info">how to set up?</button></p>
+  <div id="friend-mode-sub">friend mode</div>
 </header>
 
 <!-- Info overlay -->
@@ -581,8 +595,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = '4b1141d';
-  var BUILD_TIME     = '2026-07-02 01:51 UTC';
+  var GIT_COMMIT     = '0321a16';
+  var BUILD_TIME     = '2026-07-02 02:02 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -645,10 +659,12 @@
   if (isFriendMode) {
     function _initFriendModeUI() {
       var _h1 = document.querySelector('header h1');
-      if (_h1) _h1.textContent = 'RollShare (friend-mode)';
+      if (_h1) _h1.textContent = 'RollShare';
+      var _sub = document.getElementById('friend-mode-sub');
+      if (_sub) _sub.style.display = 'inline-flex';
       var _friendRow = document.getElementById('friend-name-row');
       var _friendInput = document.getElementById('friend-name-input');
-      if (_friendRow) _friendRow.style.display = '';
+      if (_friendRow) _friendRow.style.display = 'block';
       if (_friendInput) {
         try {
           var _saved = localStorage.getItem('rs_friend_name') || '';
