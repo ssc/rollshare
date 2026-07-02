@@ -57,6 +57,7 @@
       align-items: center;
       justify-content: center;
       padding: 0.85rem;
+      padding-bottom: calc(0.85rem + var(--devpanel-h, 0px));
       overflow: hidden;
     }
     header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.5rem; text-align: center; }
@@ -304,26 +305,39 @@
     }
     #upload-bar { height: 100%; width: 0%; background: #16a34a; border-radius: 2px; transition: width 0.2s; }
 
+    /* ── Friend calibration banner ── */
+    #calib-banner {
+      width: 100%; max-width: 460px;
+      margin: 6px auto 0;
+      padding: 0.38rem 0.75rem;
+      background: #0f1f1a; border: 1px solid #2a5038; border-radius: 8px;
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.78rem; color: #86efac; line-height: 1.4;
+    }
+    #calib-banner-text { flex: 1; }
+    #calib-reset-btn {
+      flex-shrink: 0; padding: 0.18rem 0.45rem;
+      background: transparent; border: 1px solid #2a5038; border-radius: 5px;
+      color: #4a8a60; font-size: 0.7rem; cursor: pointer; font-family: inherit;
+    }
+    #calib-reset-btn:hover { border-color: #3e7a58; color: #86efac; }
+
     footer { margin-top: auto; padding-top: 0.85rem; font-size: 0.68rem; color: #2a2a3a; text-align: center; }
 
-    /* debug log panel — fixed overlay, shown only in debug mode */
+    /* debug log panel — lives inside #devmode-panel */
     #dbg-panel {
       display: none;
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 9000;
-      background: #0a0f0a; border-top: 1px solid #1a3020;
-      padding: 0.4rem 0.5rem; box-sizing: border-box;
+      border-top: 1px solid #1a3020; padding: 0.4rem 0; box-sizing: border-box;
       max-height: 130px; overflow-y: auto; font-family: monospace; font-size: 0.68rem; color: #4ade80;
     }
     #dbg-panel.visible { display: block; }
     .dbg-err { color: #f87171; }
     .dbg-warn { color: #fbbf24; }
 
-    /* motion diff graph — fixed overlay, shown only in debug mode */
+    /* motion diff graph — lives inside #devmode-panel */
     #motion-graph-wrap {
       display: none;
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 8999;
-      background: #050d07; border-top: 1px solid #1a3020;
-      padding: 0.35rem 0.5rem 0.4rem; box-sizing: border-box;
+      border-top: 1px solid #1a3020; padding: 0.35rem 0 0.4rem;
     }
     #motion-graph-wrap.visible { display: block; }
     #motion-graph-label {
@@ -332,12 +346,10 @@
     }
     #motion-graph { display: block; width: 100%; height: 72px; }
 
-    /* canvas preview panel — fixed overlay, shown only in debug mode */
+    /* canvas preview panel — lives inside #devmode-panel */
     #canvas-preview-wrap {
       display: none;
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 8998;
-      background: #050d07; border-top: 1px solid #1a3020;
-      padding: 0.35rem 0.5rem 0.4rem; box-sizing: border-box;
+      border-top: 1px solid #1a3020; padding: 0.35rem 0 0.4rem;
     }
     #canvas-preview-wrap.visible { display: block; }
     #canvas-preview-label {
@@ -373,7 +385,7 @@
     #devmode-panel {
       display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10000;
       background: rgba(10,8,4,0.97); border-top: 1px solid #f97316;
-      padding: 12px; overflow-y: auto;
+      padding: 12px; overflow-y: auto; max-height: 65vh;
       flex-direction: column; gap: 8px;
       font-family: monospace; box-shadow: 0 -4px 24px rgba(0,0,0,0.7);
     }
@@ -528,6 +540,10 @@
 </div>
 
 <div id="upload-bar-wrap"><div id="upload-bar"></div></div>
+<div id="calib-banner" style="display:none" role="status" aria-live="polite">
+  <span id="calib-banner-text">📐 Calibrating dice size… 0/5</span>
+  <button id="calib-reset-btn" type="button" title="Reset calibration">↺ Reset</button>
+</div>
 </div><!-- #cam-content -->
 
 </div><!-- #page-rotate-wrapper -->
@@ -622,8 +638,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = 'ab6c5ef';
-  var BUILD_TIME     = '2026-07-02 03:56 UTC';
+  var GIT_COMMIT     = 'e26c0ce';
+  var BUILD_TIME     = '2026-07-02 21:12 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -775,15 +791,28 @@
   // swap to noise / blocks / dice-clip feeds as usual.
   if (isShim && typeof MediaStream !== 'undefined') {
     var _fakeCanvas = document.createElement('canvas');
-    _fakeCanvas.width = 160; _fakeCanvas.height = 120;
+    _fakeCanvas.width = 320; _fakeCanvas.height = 240;
+    // Draw a still empty-tray photo so the DiceAnalyzer can capture a real background.
+    // Falls back to a dark fill if the image fails to load (cross-origin, etc.).
     (function _paintFake() {
       var ctx = _fakeCanvas.getContext('2d');
-      ctx.fillStyle = '#111';
-      ctx.fillRect(0, 0, 160, 120);
-      ctx.fillStyle = '#4af';
-      ctx.font = '13px monospace';
-      ctx.fillText('Fake cam (shim)', 8, 62);
-      setTimeout(_paintFake, 500);
+      ctx.fillStyle = '#1a1a0e';
+      ctx.fillRect(0, 0, 320, 240);
+      var _bgImg = new Image();
+      _bgImg.onload = function () {
+        // Draw the tray image, then keep redrawing it at ~2 fps to hold the still.
+        (function _loop() {
+          ctx.drawImage(_bgImg, 0, 0, 320, 240);
+          setTimeout(_loop, 500);
+        })();
+      };
+      _bgImg.onerror = function () {
+        // Fallback: label so it's obvious the image failed
+        ctx.fillStyle = '#4af';
+        ctx.font = '13px monospace';
+        ctx.fillText('Empty tray (shim)', 8, 120);
+      };
+      _bgImg.src = '../assets/paper_tray_00.jpg';
     })();
     var _fakeGetUserMedia = function() {
       var stream = _fakeCanvas.captureStream ? _fakeCanvas.captureStream(10) : new MediaStream();
@@ -849,6 +878,85 @@
 
   // Friend session colour — loaded from localStorage, sent in hello payload.
   var friendPipColor = 'blue';
+
+  // ── Friend die-size calibration ───────────────────────────────────────────
+  // Keyed by the broker (QR) rendezvous key so calibration persists across
+  // sessions with the same host even when the private channel key rotates.
+  var _LS_FRIEND_CALIB_PREFIX = 'rs_friend_calib_';
+  var _FRIEND_CALIB_NEEDED    = 3;   // settled-frame events before locking in
+  var friendCalib         = null;    // null = uncalibrated; {w_sf,h_sf,...} when done
+  var _friendCalibBoxes   = [];      // raw (w,h) observations accumulated so far
+  var _friendCalibEvents  = 0;       // number of calib_sample events received (one per roll)
+
+  function _loadFriendCalib() {
+    if (!rendezvousKey) return;
+    try {
+      var raw = localStorage.getItem(_LS_FRIEND_CALIB_PREFIX + rendezvousKey);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.w_sf > 0 && parsed.h_sf > 0) {
+          friendCalib = parsed;
+          return;
+        }
+      }
+    } catch (_) {}
+    friendCalib = null;
+  }
+
+  function _saveFriendCalib(wSf, hSf) {
+    if (!rendezvousKey) return;
+    var entry = { w_sf: wSf, h_sf: hSf, samples: _friendCalibBoxes.length, saved_at: new Date().toISOString() };
+    try { localStorage.setItem(_LS_FRIEND_CALIB_PREFIX + rendezvousKey, JSON.stringify(entry)); } catch (_) {}
+    friendCalib = entry;
+    dbg('friend calib saved: w=' + wSf + ' h=' + hSf + ' from ' + entry.samples + ' obs');
+  }
+
+  function _clearFriendCalib() {
+    if (!rendezvousKey) return;
+    try { localStorage.removeItem(_LS_FRIEND_CALIB_PREFIX + rendezvousKey); } catch (_) {}
+    friendCalib = null;
+    _friendCalibBoxes = [];
+    _friendCalibEvents = 0;
+  }
+
+  // hintText: optional transient advisory to show instead of the progress counter.
+  // Pass null/undefined to show normal progress.
+  function _updateCalibBanner(hintText) {
+    var banner   = document.getElementById('calib-banner');
+    var bannerTx = document.getElementById('calib-banner-text');
+    if (!banner) return;
+    if (!(isFriendMode || _isFriendReconnect)) { banner.style.display = 'none'; return; }
+    banner.style.display = 'flex';
+    if (friendCalib) {
+      bannerTx.textContent = '📐 Calibrated ✓';
+      banner.style.borderColor = '#1a4a2a';
+      banner.style.color = '#4a9a6a';
+    } else if (hintText) {
+      bannerTx.textContent = '⚠️ ' + hintText;
+      banner.style.borderColor = '#4a3a10';
+      banner.style.color = '#fbbf24';
+    } else {
+      var n = _friendCalibEvents;
+      bannerTx.textContent = '📐 Learning dice size\u2026 ' + Math.min(n, _FRIEND_CALIB_NEEDED) + '/' + _FRIEND_CALIB_NEEDED;
+      banner.style.borderColor = '#2a5038';
+      banner.style.color = '#86efac';
+    }
+  }
+
+  // Initialise calibration state (call after isFriendMode / _isFriendReconnect is known)
+  if (isFriendMode || _isFriendReconnect) {
+    _loadFriendCalib();
+    // Banner shown once camera starts / private channel assigned;
+    // wire up the Reset button now so the handler is always attached.
+    var _calibResetBtn = document.getElementById('calib-reset-btn');
+    if (_calibResetBtn) {
+      _calibResetBtn.addEventListener('click', function () {
+        _clearFriendCalib();
+        _updateCalibBanner();
+        dbg('friend calib reset by user');
+      });
+    }
+  }
 
   function _canSendFrames() {
     return !isFriendMode || friendAssigned;
@@ -927,6 +1035,9 @@
         localStorage.setItem(_LS_FRIEND_KEY_PREFIX + _brokerKey + '_name', _fnameStore);
       }
     } catch (_) {}
+    // Re-check calibration now that we know the broker key and are on the private channel
+    _loadFriendCalib();
+    if (cameraStarted) _updateCalibBanner();
     initSupabase(true);
   }
 
@@ -1159,6 +1270,7 @@
         broadcastChannel = supabase
           .channel('cloud:' + activeRendezvousKey)
           .on('presence', { event: 'leave' }, function (payload) {
+            if (isShim) return; // relay doesn't support presence; ignore
             var left = (payload && payload.leftPresences) || [];
             var companionLeft = left.some(function (p) { return p.user === 'companion'; });
             if (companionLeft) {
@@ -1192,7 +1304,7 @@
                   _dismissZombieOverlay();
                   if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
                 }
-              } else if (cameraStarted) {
+              } else if (cameraStarted && !isShim) {
                 // Synced but companion is not present and camera is running — companion
                 // went away without us seeing a leave event (silent WS drop on our side).
                 dbg('presence sync: companion absent while camera running — showing zombie', 'warn');
@@ -1302,6 +1414,54 @@
             if (!_fk) return;
             _switchToFriendPrivateChannel(_fk, bcast.friend_name || 'Friend');
           })
+          .on('broadcast', { event: 'calib_sample' }, function (payload) {
+            // Only process on the private friend channel and only before calibration is done.
+            if (!friendAssigned) return;
+            if (friendCalib) return;
+            var bcast    = (payload && payload.payload) || payload || {};
+            var boxes    = bcast.boxes || [];   // calib-quality (square-ish) contour boxes
+            var boxCount = typeof bcast.box_count === 'number' ? bcast.box_count : boxes.length;
+            var edgeWarn = !!bcast.edge_warning;
+
+            // Case 1: multiple dice detected — ask user to roll only one.
+            if (boxCount > 1) {
+              dbg('calib_sample: ' + boxCount + ' dice detected — skipping', 'warn');
+              _updateCalibBanner('Please roll only one die at a time');
+              return;
+            }
+
+            // Cases 2 & 3: no valid (square-ish) box.
+            if (boxes.length === 0) {
+              if (edgeWarn) {
+                dbg('calib_sample: no square box + edge warning — skipping', 'warn');
+                _updateCalibBanner('Try rolling closer to the center');
+              }
+              // else: silent ignore (non-square contour, not near edge)
+              return;
+            }
+
+            // Cases 4 & 5: exactly one valid box — accumulate and count.
+            var b = boxes[0];
+            if (b.w > 5 && b.h > 5 && b.w < 75 && b.h < 75) {
+              _friendCalibBoxes.push({ w: b.w, h: b.h });
+            }
+            _friendCalibEvents++;
+            dbg('calib_sample: event=' + _friendCalibEvents + ' box=' + b.w + 'x' + b.h
+              + (edgeWarn ? ' (edge warning)' : '') + ' total_boxes=' + _friendCalibBoxes.length);
+            // Case 4: valid roll but near edge — increment and show soft hint.
+            // Case 5: clean roll — increment, normal progress banner.
+            _updateCalibBanner(edgeWarn ? 'Try rolling closer to the center' : null);
+            if (_friendCalibEvents >= _FRIEND_CALIB_NEEDED) {
+              // Compute median w and h across all accumulated observations
+              var _ws = _friendCalibBoxes.map(function(b) { return b.w; }).slice().sort(function(a,b){return a-b;});
+              var _hs = _friendCalibBoxes.map(function(b) { return b.h; }).slice().sort(function(a,b){return a-b;});
+              var _medW = _ws[Math.floor(_ws.length / 2)];
+              var _medH = _hs[Math.floor(_hs.length / 2)];
+              _saveFriendCalib(_medW, _medH);
+              _updateCalibBanner();
+              if (!isDev) { try { posthog.capture('friend_calib_complete', { rendezvous_short: activeRendezvousKey.slice(-6), w_sf: _medW, h_sf: _medH }); } catch(_) {} }
+            }
+          })
           .subscribe(function (status) {
             dbg('broadcast channel status: ' + status);
             if (status === 'SUBSCRIBED') {
@@ -1338,22 +1498,26 @@
               // ── Periodic presence watchdog ─────────────────────────────────────────
               // Poll every 10 s.  If companion is absent and camera is running, the WS
               // likely dropped silently without firing a leave/sync event.
+              // Skipped in shim/relay mode — relay doesn't support Supabase Presence so
+              // presenceState() always returns {} and would false-fire immediately.
               if (typeof window._presenceWatchdogId === 'undefined') window._presenceWatchdogId = null;
               if (window._presenceWatchdogId !== null) clearInterval(window._presenceWatchdogId);
-              window._presenceWatchdogId = setInterval(function () {
-                if (document.getElementById('zombie-overlay')) return; // already showing
-                if (!cameraStarted) return; // no active session to watch
-                try {
-                  var _wps = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
-                  var _wcp = Object.values(_wps).some(function(pp) {
-                    return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
-                  });
-                  if (!_wcp) {
-                    dbg('watchdog: companion absent — showing zombie', 'warn');
-                    _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
-                  }
-                } catch (_) {}
-              }, 10000);
+              if (!isShim) {
+                window._presenceWatchdogId = setInterval(function () {
+                  if (document.getElementById('zombie-overlay')) return; // already showing
+                  if (!cameraStarted) return; // no active session to watch
+                  try {
+                    var _wps = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                    var _wcp = Object.values(_wps).some(function(pp) {
+                      return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                    });
+                    if (!_wcp) {
+                      dbg('watchdog: companion absent — showing zombie', 'warn');
+                      _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
+                    }
+                  } catch (_) {}
+                }, 10000);
+              }
               // Friend mode: update status to reflect which channel phase we're in, and
               // flush cam_label + geo that were blocked while on the broker channel.
               if (isFriendMode) {
@@ -1622,9 +1786,19 @@
     if (_mgWrap) _mgWrap.classList.add('visible');
     var _cpvWrap = document.getElementById('canvas-preview-wrap');
     if (_cpvWrap) _cpvWrap.classList.add('visible');
-    // Auto-open the devmode panel so debug elements are visible without a click.
+    // Open the combined panel and show the toggle button so the user can
+    // dismiss/re-open it. The ⚙ button is normally only shown when isDev
+    // (handled in the IIFE below); show it here for debug-only sessions too.
     var _dmPanel = document.getElementById('devmode-panel');
-    if (_dmPanel) _dmPanel.classList.add('open');
+    if (_dmPanel) {
+      _dmPanel.classList.add('open');
+      // Defer height sync one frame so the panel has rendered before we measure.
+      requestAnimationFrame(function () {
+        document.documentElement.style.setProperty('--devpanel-h', _dmPanel.offsetHeight + 'px');
+      });
+    }
+    var _devBtn = document.getElementById('devmode-toggle-btn');
+    if (_devBtn) _devBtn.style.display = 'flex';
   }
   // Log version immediately so it appears at the top of the debug panel
   // (broadcastChannel not yet open here, so console-only)
@@ -1723,10 +1897,12 @@
           reader.readAsDataURL(blob);
         });
         uploadBar.style.width = '70%';
+        var _inlinePayload = { type: 'frame', image_b64: b64, peak_before_settle: peakBeforeSettle, frame_seq: seq };
+        if (friendCalib) _inlinePayload.die_hint = { w_sf: friendCalib.w_sf, h_sf: friendCalib.h_sf };
         var bcResult = await broadcastChannel.send({
           type: 'broadcast',
           event: 'frame',
-          payload: { type: 'frame', image_b64: b64, peak_before_settle: peakBeforeSettle, frame_seq: seq },
+          payload: _inlinePayload,
         });
         dbg('inline broadcast result=' + JSON.stringify(bcResult));
         uploadBar.style.width = '100%';
@@ -1758,10 +1934,12 @@
         }
         dbg('upload ok, sending broadcast frame event');
         uploadBar.style.width = '80%';
+        var _storagePayload = { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq };
+        if (friendCalib) _storagePayload.die_hint = { w_sf: friendCalib.w_sf, h_sf: friendCalib.h_sf };
         var bcResult2 = await broadcastChannel.send({
           type: 'broadcast',
           event: 'frame',
-          payload: { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq },
+          payload: _storagePayload,
         });
         dbg('storage broadcast result=' + JSON.stringify(bcResult2));
         uploadBar.style.width = '100%';
@@ -1882,6 +2060,8 @@
     setStatus('\uD83D\uDC41', 'Watching for motion\u2026', 'Point camera at the dice tray');
     frameTimerId = setInterval(processFrame, Math.round(1000 / 12));
     _sendFrameOnStart = true;  // request one display-only frame on the next tick
+    // Show calibration banner for friend sessions (after camera starts so layout is stable)
+    if (isFriendMode || _isFriendReconnect) _updateCalibBanner();
 
     if (!isDev) { try { posthog.capture('cloud_session_started', { rendezvous_short: activeRendezvousKey.slice(-6), friend_mode: isFriendMode }); } catch(_) {} }
   });
