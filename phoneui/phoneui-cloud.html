@@ -570,8 +570,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = '8878dd9';
-  var BUILD_TIME     = '2026-07-01 23:41 UTC';
+  var GIT_COMMIT     = 'a4d32db';
+  var BUILD_TIME     = '2026-07-02 00:13 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1064,21 +1064,31 @@
             // them (only for newly-seen members).  Catch this case explicitly so the
             // zombie overlay is dismissed even when the phone's WS reconnected after
             // Companion was already online.
-            if (!document.getElementById('zombie-overlay')) return;
+            // NOTE: do NOT guard on zombie-overlay presence here.  The common failure
+            // mode is: phone WS silently drops (Android background throttling) → 
+            // Companion restarts → phone WS reconnects → sync fires → companion IS
+            // present → but no zombie was ever shown.  We must re-send hello regardless.
             try {
               var _ps = broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
               var _companionPresent = Object.values(_ps).some(function(pp) {
                 return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
               });
               if (_companionPresent) {
-                dbg('presence sync: companion already present — recovering zombie');
+                dbg('presence sync: companion present — re-tracking and re-sending hello');
                 broadcastChannel.track({ user: 'phone' });
                 broadcastChannel.send({
                   type: 'broadcast', event: _helloEventName(),
                   payload: _helloPayload(),
                 }).catch(function () {});
-                _dismissZombieOverlay();
-                if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+                if (document.getElementById('zombie-overlay')) {
+                  _dismissZombieOverlay();
+                  if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+                }
+              } else if (cameraStarted) {
+                // Synced but companion is not present and camera is running — companion
+                // went away without us seeing a leave event (silent WS drop on our side).
+                dbg('presence sync: companion absent while camera running — showing zombie', 'warn');
+                _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
               }
             } catch (_) {}
           })
@@ -1207,6 +1217,25 @@
                 setStatus('\uD83D\uDD04', 'Reconnecting…', 'Friend session restoring');
                 setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 400);
               }
+              // ── Periodic presence watchdog ─────────────────────────────────────────
+              // Poll every 20 s.  If companion is absent and camera is running, the WS
+              // likely dropped silently without firing a leave/sync event.
+              if (typeof window._presenceWatchdogId === 'undefined') window._presenceWatchdogId = null;
+              if (window._presenceWatchdogId !== null) clearInterval(window._presenceWatchdogId);
+              window._presenceWatchdogId = setInterval(function () {
+                if (document.getElementById('zombie-overlay')) return; // already showing
+                if (!cameraStarted) return; // no active session to watch
+                try {
+                  var _wps = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                  var _wcp = Object.values(_wps).some(function(pp) {
+                    return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                  });
+                  if (!_wcp) {
+                    dbg('watchdog: companion absent — showing zombie', 'warn');
+                    _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
+                  }
+                } catch (_) {}
+              }, 20000);
               // Friend mode: update status to reflect which channel phase we're in, and
               // flush cam_label + geo that were blocked while on the broker channel.
               if (isFriendMode) {
