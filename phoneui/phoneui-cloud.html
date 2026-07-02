@@ -638,8 +638,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = '0c44efb';
-  var BUILD_TIME     = '2026-07-02 23:14 UTC';
+  var GIT_COMMIT     = '7378722';
+  var BUILD_TIME     = '2026-07-02 23:36 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -726,6 +726,14 @@
       var _friendInput = document.getElementById('friend-name-input');
       if (_friendRow) _friendRow.style.display = 'block';
       if (_friendInput) {
+        // Only allow alphanumeric characters (no spaces) — shared constraint with
+        // the primary pip-title-input in companion.html.
+        _friendInput.addEventListener('keypress', function(e) {
+          var ch = e.key;
+          if (ch && ch.length === 1 && !/^[A-Za-z0-9]$/.test(ch)) {
+            e.preventDefault();
+          }
+        });
         try {
           var _saved = localStorage.getItem('rs_friend_name') || '';
           if (_saved) _friendInput.value = _saved;
