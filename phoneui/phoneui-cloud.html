@@ -570,8 +570,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = 'a4d32db';
-  var BUILD_TIME     = '2026-07-02 00:13 UTC';
+  var GIT_COMMIT     = '665ee64';
+  var BUILD_TIME     = '2026-07-02 00:42 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1316,6 +1316,34 @@
       _zombieTimerId = setTimeout(_tick, 1000);
     }
     _zombieTimerId = setTimeout(_tick, 1000);
+    // In friend-reconnect mode the private key may be stale (Companion moved to a
+    // new slot key).  After the countdown expires, clear the stale localStorage entry
+    // so the next QR scan goes through the broker and gets a fresh valid key.
+    if (_isFriendReconnect) {
+      var _staleCheckId = setTimeout(function () {
+        if (!document.getElementById('zombie-overlay')) return;
+        // Clear the stale private-key mapping so future broker URL visits reconnect fresh.
+        try {
+          // Walk all localStorage keys for this origin and remove any rs_friend_pk_* entry
+          // whose stored value matches our current (stale) activeRendezvousKey.
+          for (var _i = localStorage.length - 1; _i >= 0; _i--) {
+            var _k = localStorage.key(_i);
+            if (_k && _k.indexOf(_LS_FRIEND_KEY_PREFIX) === 0) {
+              if (localStorage.getItem(_k) === activeRendezvousKey) {
+                localStorage.removeItem(_k);
+                localStorage.removeItem(_k + '_name');
+                dbg('cleared stale localStorage entry: ' + _k, 'warn');
+              }
+            }
+          }
+        } catch (_) {}
+        var _cdEl2 = document.getElementById('zombie-countdown');
+        if (_cdEl2) {
+          _cdEl2.textContent = 'Friend session expired \u2014 please rescan the Friends QR code from the RollShare app.';
+          _cdEl2.style.color = '#f5b7b1';
+        }
+      }, 180000); // 3 minutes — timer self-guards with zombie-overlay existence check
+    }
   }
 
   function _dismissZombieOverlay() {
