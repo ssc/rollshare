@@ -44,6 +44,8 @@
     var _subCallback = null;
     var _ref = 0;
     var _topic = "realtime:" + channelName;
+    var _subscribedAt = 0;   // timestamp when SUBSCRIBED
+    var _lastMsg = 0;        // timestamp of last inbound broadcast
 
     function _nextRef() { return String(++_ref); }
 
@@ -87,6 +89,7 @@
           // Original payload from phone: {type:"broadcast", event:"heartbeat", payload:{...}}
           var inner = payload;
           var evName = inner.event || inner.type || "";
+          _lastMsg = Date.now(); // companion sent something → mark as alive
           _triggerHandlers(evName, inner.payload || inner);
         }
       };
@@ -112,6 +115,7 @@
       subscribe: function (cb) {
         _subCallback = cb || null;
         _connect(function () {
+          _subscribedAt = Date.now();
           if (cb) { cb("SUBSCRIBED"); }
         });
         return _channel;
@@ -132,10 +136,20 @@
       },
 
       track: function (state) {
-        // Presence track is a no-op in the relay shim — the relay doesn't
-        // implement the Phoenix Presence protocol.  Zombie detection via
-        // presence_diff/leave won't fire in devmode without a real Companion.
         return Promise.resolve({ status: "ok" });
+      },
+
+      // presenceState: return companion as present while the WS is connected, OR
+      // within the first 20s of subscribe (covers the initial companion_hello race),
+      // OR within 60s of the last inbound message.  The relay has no presence
+      // protocol so we synthesise a plausible answer instead of always returning {}.
+      presenceState: function () {
+        var now = Date.now();
+        var wsOpen  = _ws && _ws.readyState === WebSocket.OPEN;
+        var grace   = _subscribedAt > 0 && (now - _subscribedAt) < 20000;
+        var recent  = _lastMsg > 0 && (now - _lastMsg) < 60000;
+        if (!wsOpen && !grace && !recent) return {};
+        return { companion_shim: [{ user: 'companion', presence_ref: 'shim' }] };
       },
 
       unsubscribe: function () {
@@ -187,9 +201,20 @@
   };
 
   // ── Client factory ────────────────────────────────────────────────────────
+  var _activeChannels = [];
   function _createClient(url, key) {
     return {
-      channel: function (name) { return _makeChannel(name); },
+      channel: function (name) {
+        var ch = _makeChannel(name);
+        _activeChannels.push(ch);
+        return ch;
+      },
+      removeChannel: function (ch) {
+        var idx = _activeChannels.indexOf(ch);
+        if (idx >= 0) _activeChannels.splice(idx, 1);
+        if (ch && typeof ch.unsubscribe === 'function') ch.unsubscribe();
+        return Promise.resolve();
+      },
       auth:    _auth,
       storage: _storage,
     };

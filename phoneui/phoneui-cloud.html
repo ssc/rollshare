@@ -60,22 +60,23 @@
       overflow: hidden;
     }
     header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.5rem; text-align: center; }
-    header .header-title-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
+    header .header-title-row { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
     header .header-title-row img { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; }
     header h1 { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin: 0; }
     header p  { color: #777; font-size: 1.0rem; margin-top: 0.25rem; }
 
     #friend-mode-sub {
       display: none;
-      margin-top: 0.3rem;
-      padding: 0.24rem 0.58rem;
+      align-self: center;
+      padding: 0.18rem 0.5rem;
       border-radius: 999px;
       border: 1px solid #365f49;
       background: #14261d;
       color: #9be6b6;
-      font-size: 0.72rem;
+      font-size: 0.62rem;
       font-weight: 700;
       letter-spacing: 0.02em;
+      line-height: 1;
     }
 
     #error-banner {
@@ -149,20 +150,29 @@
 
     /* ── Controls ── */
     #controls { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 0.45rem; }
+    #action-row-wrap { width: 100%; max-width: 460px; }
 
     #friend-name-row {
       display: none;
       width: 100%; max-width: 460px;
-      margin: 0.2rem auto 0.1rem;
+      margin: 0.65rem auto 0.1rem;
+      padding-top: 10px;
+    }
+    #friend-name-label-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
     }
     #friend-name-label {
-      display: block;
       font-size: 0.72rem;
       color: #8ab29a;
-      margin-bottom: 0.2rem;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     #friend-name-input {
-      width: 100%;
+      flex: 0 0 50%;
+      min-width: 0;
       background: #0f1a14;
       border: 1px solid #2a5038;
       border-radius: 8px;
@@ -177,17 +187,21 @@
     }
 
     #friend-color-label {
-      display: block;
       font-size: 0.72rem;
       color: #8ab29a;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #friend-color-row-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
       margin-top: 0.4rem;
-      margin-bottom: 0.2rem;
     }
     .friend-color-row {
       display: flex;
       align-items: center;
       gap: 0.35rem;
-      margin-top: 0.1rem;
     }
     .friend-swatch {
       width: 22px;
@@ -210,7 +224,9 @@
     .friend-swatch-yellow { background: #d7b93d; }
 
     /* camera selector — native select overlaid on a styled div */
-    #camera-select-wrap { position: relative; width: 100%; }
+    #camera-select-row { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
+    #camera-select-label { font-size: 0.72rem; color: #8ab29a; white-space: nowrap; flex-shrink: 0; }
+    #camera-select-wrap { position: relative; flex: 1; min-width: 0; }
     #camera-select-face {
       width: 100%; padding: 0.55rem 2rem 0.55rem 0.7rem;
       background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
@@ -428,9 +444,9 @@
   <div class="header-title-row">
     <img src="../assets/rollshare_logo.png" alt="RollShare" />
     <h1>RollShare</h1>
+    <div id="friend-mode-sub">friend mode</div>
   </div>
   <p>Point phone down at the dice tray — <button id="info-btn" title="How to set up" aria-label="Setup info">how to set up?</button></p>
-  <div id="friend-mode-sub">friend mode</div>
 </header>
 
 <!-- Info overlay -->
@@ -470,30 +486,41 @@
   <span id="status-version"></span>
 </div>
 
-<div id="friend-name-row" aria-label="Friend display name">
-  <label id="friend-name-label" for="friend-name-input">Your name (shown to host)</label>
-  <input id="friend-name-input" type="text" maxlength="64" placeholder="Friend" autocomplete="name" />
-  <label id="friend-color-label">Your color</label>
-  <div class="friend-color-row" id="friend-color-row" role="group" aria-label="Your pip color">
-    <button type="button" class="friend-swatch friend-swatch-blue" data-color="blue" title="Blue"></button>
-    <button type="button" class="friend-swatch friend-swatch-green" data-color="green" title="Green"></button>
-    <button type="button" class="friend-swatch friend-swatch-red" data-color="red" title="Red"></button>
-    <button type="button" class="friend-swatch friend-swatch-yellow" data-color="yellow" title="Yellow"></button>
-    <button type="button" class="friend-swatch friend-swatch-black" data-color="black" title="Black"></button>
-  </div>
-</div>
-
 <!-- Controls -->
 <div id="controls">
-  <div id="camera-select-wrap">
-    <div id="camera-select-face">Default rear camera</div>
-    <select id="cameraSelect" aria-label="Select camera"></select>
-    <div id="cam-picker-panel"></div>
+  <div id="camera-select-row">
+    <span id="camera-select-label">Select camera</span>
+    <div id="camera-select-wrap">
+      <div id="camera-select-face">Default rear camera</div>
+      <select id="cameraSelect" aria-label="Select camera"></select>
+      <div id="cam-picker-panel"></div>
+    </div>
   </div>
   <div id="no-torch-banner" style="display:none" role="alert">
     <span>⚠️ No flashlight on this camera — RollShare will not be able to detect rolls</span>
     <button id="no-torch-switch-btn" style="display:none">Switch ↗</button>
   </div>
+</div>
+
+<div id="friend-name-row" aria-label="Friend display name">
+  <div id="friend-name-label-row">
+    <label id="friend-name-label" for="friend-name-input">Name</label>
+    <input id="friend-name-input" type="text" maxlength="11" placeholder="Grape" autocomplete="name" />
+  </div>
+  <div id="friend-color-row-wrap">
+    <label id="friend-color-label">Border color</label>
+    <div class="friend-color-row" id="friend-color-row" role="group" aria-label="Your pip color">
+      <button type="button" class="friend-swatch friend-swatch-blue" data-color="blue" title="Blue"></button>
+      <button type="button" class="friend-swatch friend-swatch-green" data-color="green" title="Green"></button>
+      <button type="button" class="friend-swatch friend-swatch-red" data-color="red" title="Red"></button>
+      <button type="button" class="friend-swatch friend-swatch-yellow" data-color="yellow" title="Yellow"></button>
+      <button type="button" class="friend-swatch friend-swatch-black" data-color="black" title="Black"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Action row (torch + start) -->
+<div id="action-row-wrap">
   <div id="action-row">
     <button id="torch-btn" title="Toggle torch">🔦 Torch</button>
     <button id="start-btn" style="display:none">Start Camera</button>
@@ -595,8 +622,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = 'a65251e';
-  var BUILD_TIME     = '2026-07-02 02:13 UTC';
+  var GIT_COMMIT     = 'ab6c5ef';
+  var BUILD_TIME     = '2026-07-02 03:56 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -619,11 +646,28 @@
   var isDev          = params.get('dev') === '1';
   var isShim         = params.get('shim') === '1';  // local relay mode — fake camera allowed
   var isFriendMode   = _isTruthyParam(params.get('friend'));
+  // Log startup context immediately so DevTools console shows what mode we're in.
+  console.log('[rs-phoneui] STARTUP key=' + rendezvousKey.slice(-8) +
+    ' friend=' + isFriendMode + ' shim=' + isShim + ' dev=' + isDev +
+    ' relay=' + (params.get('relay') || '') +
+    ' reconnect=' + (params.get('reconnect') || ''));
+  console.log('[rs-phoneui] full key: ' + rendezvousKey);
+  // Check localStorage for any previously-stored private key for this broker
+  if (isFriendMode && rendezvousKey) {
+    var _lsCheck = null;
+    try { _lsCheck = localStorage.getItem('rs_friend_pk_' + rendezvousKey); } catch (_) {}
+    console.log('[rs-phoneui] localStorage private key for this broker: ' + (_lsCheck ? _lsCheck.slice(-8) : 'none'));
+  }
   // 'reconnect=1' is set by _switchToFriendPrivateChannel via history.replaceState so
   // that when iOS kills and reloads the tab, the page knows it was a friend session
   // and can auto-start the camera and show the correct label without rescanning the QR.
-  var _isFriendReconnect = _isTruthyParam(params.get('reconnect')) && !isFriendMode;
-  var friendAssigned = !isFriendMode;
+  // ?friend=1&reconnect=1 = private channel reload (already assigned, skip broker).
+  var _isFriendReconnect = _isTruthyParam(params.get('reconnect'));
+  // When reconnect=1 AND friend=1, we're already assigned — skip the broker handshake.
+  if (_isFriendReconnect && isFriendMode) {
+    isFriendMode = false;   // don't re-run broker flow; _isFriendReconnect carries the flag
+  }
+  var friendAssigned = !isFriendMode;  // true when reconnect+friend (already assigned above)
   var friendEphemeralId = 'f' + Math.random().toString(36).slice(2, 12);
   var friendDisplayName = params.get('fname') || '';
 
@@ -647,7 +691,7 @@
         try {
           var _np2 = new URLSearchParams(window.location.search || '');
           _np2.set('s', _savedPk);
-          _np2.delete('friend');
+          _np2.set('friend', '1');    // keep friend=1 so UI stays in friend mode
           _np2.set('reconnect', '1');
           if (_savedPkName) _np2.set('fname', _savedPkName); else _np2.delete('fname');
           history.replaceState(null, '', '?' + _np2.toString() + (window.location.hash || ''));
@@ -656,7 +700,7 @@
     } catch (_) {}
   }
 
-  if (isFriendMode) {
+  if (isFriendMode || _isFriendReconnect) {
     function _initFriendModeUI() {
       var _h1 = document.querySelector('header h1');
       if (_h1) _h1.textContent = 'RollShare';
@@ -841,6 +885,8 @@
 
   function _switchToFriendPrivateChannel(friendKey, friendName) {
     if (!friendKey) return;
+    console.log('[rs-phoneui] _switchToFriendPrivateChannel: key=' + friendKey + ' name=' + friendName);
+    dbg('switching to private channel key=...' + friendKey.slice(-8) + ' name=' + friendName);
     friendAssigned = true;
     activeRendezvousKey = friendKey;
     friendDisplayName = friendName || friendDisplayName || 'Friend';
@@ -865,7 +911,7 @@
     try {
       var _np = new URLSearchParams(window.location.search || '');
       _np.set('s', friendKey);
-      _np.delete('friend');
+      _np.set('friend', '1');    // keep friend=1 so reload stays in friend-mode UI
       _np.set('reconnect', '1');
       var _fname = (friendName || friendDisplayName || '').trim().slice(0, 64);
       if (_fname) _np.set('fname', _fname); else _np.delete('fname');
@@ -1107,7 +1153,9 @@
           });
         }
         // Subscribe to Companion shutdown broadcasts and presence disconnect
-        dbg('subscribing to broadcast channel cloud:' + activeRendezvousKey.slice(-6));
+        dbg('subscribing to broadcast channel cloud:' + activeRendezvousKey.slice(-8));
+        console.log('[rs-phoneui] initSupabase: subscribing to cloud:' + activeRendezvousKey +
+          ' (friendAssigned=' + friendAssigned + ')');
         broadcastChannel = supabase
           .channel('cloud:' + activeRendezvousKey)
           .on('presence', { event: 'leave' }, function (payload) {
@@ -1200,6 +1248,12 @@
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
             var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.94', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
+            // companion_hello = Companion is live. Dismiss any zombie overlay.
+            if (document.getElementById('zombie-overlay')) {
+              dbg('companion_hello: dismissing zombie overlay');
+              _dismissZombieOverlay();
+              if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+            }
             // Re-send hello only on the private channel (friendAssigned) to handle the
             // Python connection race. Do NOT re-send friend_hello on the broker channel
             // — the SUBSCRIBED handler already sent it, and re-sending creates duplicate
@@ -1235,6 +1289,10 @@
           .on('broadcast', { event: 'friend_assign' }, function (payload) {
             if (!isFriendMode || friendAssigned) return;
             var bcast = (payload && payload.payload) || payload || {};
+            console.log('[rs-phoneui] friend_assign rx: for=' + (bcast['for'] || '') +
+              ' myId=' + friendEphemeralId + ' status=' + (bcast.status || '') +
+              ' key=' + (bcast.friend_key || '').slice(-8));
+            dbg('friend_assign rx for=' + (bcast['for'] || '').slice(-6) + ' status=' + (bcast.status || '') + ' key=...' + (bcast.friend_key || '').slice(-6));
             if ((bcast['for'] || '') !== friendEphemeralId) return;
             if (bcast.status === 'busy') {
               setStatus('⏳', 'Friend seat busy', 'Host is using a friend slot already');
