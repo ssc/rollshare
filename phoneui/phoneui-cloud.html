@@ -638,8 +638,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = 'e26c0ce';
-  var BUILD_TIME     = '2026-07-02 21:12 UTC';
+  var GIT_COMMIT     = '0c44efb';
+  var BUILD_TIME     = '2026-07-02 23:14 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -879,45 +879,14 @@
   // Friend session colour — loaded from localStorage, sent in hello payload.
   var friendPipColor = 'blue';
 
-  // ── Friend die-size calibration ───────────────────────────────────────────
-  // Keyed by the broker (QR) rendezvous key so calibration persists across
-  // sessions with the same host even when the private channel key rotates.
-  var _LS_FRIEND_CALIB_PREFIX = 'rs_friend_calib_';
-  var _FRIEND_CALIB_NEEDED    = 3;   // settled-frame events before locking in
-  var friendCalib         = null;    // null = uncalibrated; {w_sf,h_sf,...} when done
-  var _friendCalibBoxes   = [];      // raw (w,h) observations accumulated so far
-  var _friendCalibEvents  = 0;       // number of calib_sample events received (one per roll)
-
-  function _loadFriendCalib() {
-    if (!rendezvousKey) return;
-    try {
-      var raw = localStorage.getItem(_LS_FRIEND_CALIB_PREFIX + rendezvousKey);
-      if (raw) {
-        var parsed = JSON.parse(raw);
-        if (parsed && parsed.w_sf > 0 && parsed.h_sf > 0) {
-          friendCalib = parsed;
-          return;
-        }
-      }
-    } catch (_) {}
-    friendCalib = null;
-  }
-
-  function _saveFriendCalib(wSf, hSf) {
-    if (!rendezvousKey) return;
-    var entry = { w_sf: wSf, h_sf: hSf, samples: _friendCalibBoxes.length, saved_at: new Date().toISOString() };
-    try { localStorage.setItem(_LS_FRIEND_CALIB_PREFIX + rendezvousKey, JSON.stringify(entry)); } catch (_) {}
-    friendCalib = entry;
-    dbg('friend calib saved: w=' + wSf + ' h=' + hSf + ' from ' + entry.samples + ' obs');
-  }
-
-  function _clearFriendCalib() {
-    if (!rendezvousKey) return;
-    try { localStorage.removeItem(_LS_FRIEND_CALIB_PREFIX + rendezvousKey); } catch (_) {}
-    friendCalib = null;
-    _friendCalibBoxes = [];
-    _friendCalibEvents = 0;
-  }
+  // ── Friend die-size calibration ─────────────────────────────────────────
+  // Calibration is now owned by the host (CloudConnection). The phone is a
+  // dumb display: it receives calib_progress events and shows the banner.
+  // No localStorage — all state lives in the host's DiceAnalyzer for the
+  // lifetime of the connection.
+  var _friendCalibDone    = false;  // true once host signals done:true
+  var _friendCalibCount   = 0;      // last count reported by host
+  var _friendCalibNeeded  = 3;      // last needed reported by host
 
   // hintText: optional transient advisory to show instead of the progress counter.
   // Pass null/undefined to show normal progress.
@@ -927,8 +896,8 @@
     if (!banner) return;
     if (!(isFriendMode || _isFriendReconnect)) { banner.style.display = 'none'; return; }
     banner.style.display = 'flex';
-    if (friendCalib) {
-      bannerTx.textContent = '📐 Calibrated ✓';
+    if (_friendCalibDone) {
+      bannerTx.textContent = '\uD83D\uDCCF Calibrated ✓';
       banner.style.borderColor = '#1a4a2a';
       banner.style.color = '#4a9a6a';
     } else if (hintText) {
@@ -936,8 +905,7 @@
       banner.style.borderColor = '#4a3a10';
       banner.style.color = '#fbbf24';
     } else {
-      var n = _friendCalibEvents;
-      bannerTx.textContent = '📐 Learning dice size\u2026 ' + Math.min(n, _FRIEND_CALIB_NEEDED) + '/' + _FRIEND_CALIB_NEEDED;
+      bannerTx.textContent = '\uD83D\uDCCF Learning dice size\u2026 ' + _friendCalibCount + '/' + _friendCalibNeeded;
       banner.style.borderColor = '#2a5038';
       banner.style.color = '#86efac';
     }
@@ -945,14 +913,21 @@
 
   // Initialise calibration state (call after isFriendMode / _isFriendReconnect is known)
   if (isFriendMode || _isFriendReconnect) {
-    _loadFriendCalib();
     // Banner shown once camera starts / private channel assigned;
     // wire up the Reset button now so the handler is always attached.
     var _calibResetBtn = document.getElementById('calib-reset-btn');
     if (_calibResetBtn) {
       _calibResetBtn.addEventListener('click', function () {
-        _clearFriendCalib();
+        _friendCalibDone  = false;
+        _friendCalibCount = 0;
         _updateCalibBanner();
+        // Tell the host to reset its wizard state too.
+        if (broadcastChannel) {
+          broadcastChannel.send({
+            type: 'broadcast', event: 'calib_reset_req',
+            payload: { type: 'calib_reset' },
+          }).catch(function () {});
+        }
         dbg('friend calib reset by user');
       });
     }
@@ -1414,52 +1389,19 @@
             if (!_fk) return;
             _switchToFriendPrivateChannel(_fk, bcast.friend_name || 'Friend');
           })
-          .on('broadcast', { event: 'calib_sample' }, function (payload) {
-            // Only process on the private friend channel and only before calibration is done.
+          .on('broadcast', { event: 'calib_progress' }, function (payload) {
+            // Host-driven calibration progress. The host (CloudConnection) runs the
+            // full wizard cycle and tells us where it is so we can update the banner.
             if (!friendAssigned) return;
-            if (friendCalib) return;
-            var bcast    = (payload && payload.payload) || payload || {};
-            var boxes    = bcast.boxes || [];   // calib-quality (square-ish) contour boxes
-            var boxCount = typeof bcast.box_count === 'number' ? bcast.box_count : boxes.length;
-            var edgeWarn = !!bcast.edge_warning;
-
-            // Case 1: multiple dice detected — ask user to roll only one.
-            if (boxCount > 1) {
-              dbg('calib_sample: ' + boxCount + ' dice detected — skipping', 'warn');
-              _updateCalibBanner('Please roll only one die at a time');
-              return;
-            }
-
-            // Cases 2 & 3: no valid (square-ish) box.
-            if (boxes.length === 0) {
-              if (edgeWarn) {
-                dbg('calib_sample: no square box + edge warning — skipping', 'warn');
-                _updateCalibBanner('Try rolling closer to the center');
-              }
-              // else: silent ignore (non-square contour, not near edge)
-              return;
-            }
-
-            // Cases 4 & 5: exactly one valid box — accumulate and count.
-            var b = boxes[0];
-            if (b.w > 5 && b.h > 5 && b.w < 75 && b.h < 75) {
-              _friendCalibBoxes.push({ w: b.w, h: b.h });
-            }
-            _friendCalibEvents++;
-            dbg('calib_sample: event=' + _friendCalibEvents + ' box=' + b.w + 'x' + b.h
-              + (edgeWarn ? ' (edge warning)' : '') + ' total_boxes=' + _friendCalibBoxes.length);
-            // Case 4: valid roll but near edge — increment and show soft hint.
-            // Case 5: clean roll — increment, normal progress banner.
-            _updateCalibBanner(edgeWarn ? 'Try rolling closer to the center' : null);
-            if (_friendCalibEvents >= _FRIEND_CALIB_NEEDED) {
-              // Compute median w and h across all accumulated observations
-              var _ws = _friendCalibBoxes.map(function(b) { return b.w; }).slice().sort(function(a,b){return a-b;});
-              var _hs = _friendCalibBoxes.map(function(b) { return b.h; }).slice().sort(function(a,b){return a-b;});
-              var _medW = _ws[Math.floor(_ws.length / 2)];
-              var _medH = _hs[Math.floor(_hs.length / 2)];
-              _saveFriendCalib(_medW, _medH);
-              _updateCalibBanner();
-              if (!isDev) { try { posthog.capture('friend_calib_complete', { rendezvous_short: activeRendezvousKey.slice(-6), w_sf: _medW, h_sf: _medH }); } catch(_) {} }
+            var bcast = (payload && payload.payload) || payload || {};
+            _friendCalibCount  = typeof bcast.count  === 'number' ? bcast.count  : _friendCalibCount;
+            _friendCalibNeeded = typeof bcast.needed === 'number' ? bcast.needed : _friendCalibNeeded;
+            _friendCalibDone   = !!bcast.done;
+            var hint = bcast.hint || null;
+            dbg('calib_progress: ' + _friendCalibCount + '/' + _friendCalibNeeded + (bcast.done ? ' DONE' : '') + (hint ? ' hint=' + hint : ''));
+            _updateCalibBanner(hint);
+            if (_friendCalibDone && !isDev) {
+              try { posthog.capture('friend_calib_complete', { rendezvous_short: activeRendezvousKey.slice(-6) }); } catch(_) {}
             }
           })
           .subscribe(function (status) {
@@ -1898,7 +1840,6 @@
         });
         uploadBar.style.width = '70%';
         var _inlinePayload = { type: 'frame', image_b64: b64, peak_before_settle: peakBeforeSettle, frame_seq: seq };
-        if (friendCalib) _inlinePayload.die_hint = { w_sf: friendCalib.w_sf, h_sf: friendCalib.h_sf };
         var bcResult = await broadcastChannel.send({
           type: 'broadcast',
           event: 'frame',
@@ -1935,7 +1876,6 @@
         dbg('upload ok, sending broadcast frame event');
         uploadBar.style.width = '80%';
         var _storagePayload = { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq };
-        if (friendCalib) _storagePayload.die_hint = { w_sf: friendCalib.w_sf, h_sf: friendCalib.h_sf };
         var bcResult2 = await broadcastChannel.send({
           type: 'broadcast',
           event: 'frame',
