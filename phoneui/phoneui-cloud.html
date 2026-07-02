@@ -581,8 +581,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = 'e3f2949';
-  var BUILD_TIME     = '2026-07-02 01:26 UTC';
+  var GIT_COMMIT     = '4b1141d';
+  var BUILD_TIME     = '2026-07-02 01:51 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -643,48 +643,55 @@
   }
 
   if (isFriendMode) {
-    var _h1 = document.querySelector('header h1');
-    if (_h1) _h1.textContent = 'RollShare (for friends)';
-    var _friendRow = document.getElementById('friend-name-row');
-    var _friendInput = document.getElementById('friend-name-input');
-    if (_friendRow) _friendRow.style.display = '';
-    if (_friendInput) {
+    function _initFriendModeUI() {
+      var _h1 = document.querySelector('header h1');
+      if (_h1) _h1.textContent = 'RollShare (friend-mode)';
+      var _friendRow = document.getElementById('friend-name-row');
+      var _friendInput = document.getElementById('friend-name-input');
+      if (_friendRow) _friendRow.style.display = '';
+      if (_friendInput) {
+        try {
+          var _saved = localStorage.getItem('rs_friend_name') || '';
+          if (_saved) _friendInput.value = _saved;
+        } catch (_) {}
+        friendDisplayName = (_friendInput.value || '').trim().slice(0, 64);
+        _friendInput.addEventListener('input', function () {
+          friendDisplayName = (this.value || '').trim().slice(0, 64);
+          try { localStorage.setItem('rs_friend_name', friendDisplayName); } catch (_) {}
+        });
+      }
+      // Load saved colour and wire up the colour picker
       try {
-        var _saved = localStorage.getItem('rs_friend_name') || '';
-        if (_saved) _friendInput.value = _saved;
+        var _savedColor = localStorage.getItem('rs_friend_color') || '';
+        var _validColors = ['blue','green','red','yellow','black','current'];
+        if (_savedColor && _validColors.indexOf(_savedColor) >= 0) friendPipColor = _savedColor;
       } catch (_) {}
-      friendDisplayName = (_friendInput.value || '').trim().slice(0, 64);
-      _friendInput.addEventListener('input', function () {
-        friendDisplayName = (this.value || '').trim().slice(0, 64);
-        try { localStorage.setItem('rs_friend_name', friendDisplayName); } catch (_) {}
-      });
+      var _friendColorRow = document.getElementById('friend-color-row');
+      if (_friendColorRow) {
+        _friendColorRow.querySelectorAll('.friend-swatch').forEach(function(btn) {
+          btn.classList.toggle('is-selected', btn.dataset.color === friendPipColor);
+        });
+        _friendColorRow.addEventListener('click', function(e) {
+          var btn = e.target.closest('.friend-swatch');
+          if (!btn) return;
+          friendPipColor = btn.dataset.color || 'blue';
+          _friendColorRow.querySelectorAll('.friend-swatch').forEach(function(b) { b.classList.remove('is-selected'); });
+          btn.classList.add('is-selected');
+          try { localStorage.setItem('rs_friend_color', friendPipColor); } catch (_) {}
+          // Push colour update to companion immediately if already on private channel
+          if (broadcastChannel && friendAssigned) {
+            broadcastChannel.send({
+              type: 'broadcast', event: 'broadcast',
+              payload: { type: 'pip_color_update', pip_color: friendPipColor },
+            }).catch(function() {});
+          }
+        });
+      }
     }
-    // Load saved colour and wire up the colour picker
-    try {
-      var _savedColor = localStorage.getItem('rs_friend_color') || '';
-      var _validColors = ['blue','green','red','yellow','black','current'];
-      if (_savedColor && _validColors.indexOf(_savedColor) >= 0) friendPipColor = _savedColor;
-    } catch (_) {}
-    var _friendColorRow = document.getElementById('friend-color-row');
-    if (_friendColorRow) {
-      _friendColorRow.querySelectorAll('.friend-swatch').forEach(function(btn) {
-        btn.classList.toggle('is-selected', btn.dataset.color === friendPipColor);
-      });
-      _friendColorRow.addEventListener('click', function(e) {
-        var btn = e.target.closest('.friend-swatch');
-        if (!btn) return;
-        friendPipColor = btn.dataset.color || 'blue';
-        _friendColorRow.querySelectorAll('.friend-swatch').forEach(function(b) { b.classList.remove('is-selected'); });
-        btn.classList.add('is-selected');
-        try { localStorage.setItem('rs_friend_color', friendPipColor); } catch (_) {}
-        // Push colour update to companion immediately if already on private channel
-        if (broadcastChannel && friendAssigned) {
-          broadcastChannel.send({
-            type: 'broadcast', event: 'broadcast',
-            payload: { type: 'pip_color_update', pip_color: friendPipColor },
-          }).catch(function() {});
-        }
-      });
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', _initFriendModeUI, { once: true });
+    } else {
+      _initFriendModeUI();
     }
   }
 
