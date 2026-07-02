@@ -595,8 +595,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = '0321a16';
-  var BUILD_TIME     = '2026-07-02 02:02 UTC';
+  var GIT_COMMIT     = 'a65251e';
+  var BUILD_TIME     = '2026-07-02 02:13 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -671,9 +671,23 @@
           if (_saved) _friendInput.value = _saved;
         } catch (_) {}
         friendDisplayName = (_friendInput.value || '').trim().slice(0, 64);
+        var _sendNameUpdate = function() {
+          if (broadcastChannel && friendAssigned) {
+            broadcastChannel.send({
+              type: 'broadcast', event: 'broadcast',
+              payload: { type: 'name_update', name: friendDisplayName },
+            }).catch(function() {});
+          }
+        };
         _friendInput.addEventListener('input', function () {
           friendDisplayName = (this.value || '').trim().slice(0, 64);
           try { localStorage.setItem('rs_friend_name', friendDisplayName); } catch (_) {}
+          _sendNameUpdate();
+        });
+        _friendInput.addEventListener('change', function () {
+          friendDisplayName = (this.value || '').trim().slice(0, 64);
+          try { localStorage.setItem('rs_friend_name', friendDisplayName); } catch (_) {}
+          _sendNameUpdate();
         });
       }
       // Load saved colour and wire up the colour picker
