@@ -638,8 +638,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = '7378722';
-  var BUILD_TIME     = '2026-07-02 23:40 UTC';
+  var GIT_COMMIT     = 'db79dc1';
+  var BUILD_TIME     = '2026-07-03 15:40 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -881,6 +881,7 @@
   var _grabPreviewSent = false;  // true once display-only preview has been sent for current throw
   var _sendFrameOnStart = false; // set true on camera start; processFrame sends one display frame then clears
   var frameTimerId    = null;
+  var _camSettleUntil = 0;   // epoch ms; processFrame skips diff+send until this passes (AE settle after cam switch)
   var sfCanvas        = null;
   var capCanvas       = null;
 
@@ -1177,6 +1178,12 @@
     }
     refreshTorchBtn();
     currentDeviceId = deviceId;
+    // Allow 1 s for auto-exposure to stabilise after the torch fires / stream opens.
+    // processFrame will skip diff detection and frame sends until this window passes.
+    // E2E tests inject window.__skipCamSettle=true (synthetic_camera.js) to bypass this.
+    _camSettleUntil = window.__skipCamSettle ? 0 : Date.now() + 1000;
+    settleFired = false;
+    lastMotionFrame = frameSeq;  // discard any motion that accumulated during the switch
   }
 
   // ── Torch ─────────────────────────────────────────────────────────────────
@@ -1619,8 +1626,10 @@
     frameSeq++;
     var sfCtx = sfCanvas.getContext('2d', { willReadFrequently: true });
     drawCoverTop(sfCtx, video, 160, 120);
-    // On first frame after (re)start, send a display-only preview so the companion
-    // pip is populated immediately without waiting for a dice roll.
+    // Skip diff detection + frame analysis while camera AE is settling (1 s after open/switch).
+    if (Date.now() < _camSettleUntil) return;
+    // On first settled frame after (re)start, send a display-only preview so the companion
+    // pip is populated with a clean (non-blown-out) frame.
     if (_sendFrameOnStart && broadcastChannel) {
       _sendFrameOnStart = false;
       sendDisplayFrame(frameSeq);
