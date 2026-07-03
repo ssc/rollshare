@@ -638,8 +638,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.94';
-  var GIT_COMMIT     = 'db79dc1';
-  var BUILD_TIME     = '2026-07-03 15:44 UTC';
+  var GIT_COMMIT     = 'acc504e';
+  var BUILD_TIME     = '2026-07-03 15:54 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1178,12 +1178,17 @@
     }
     refreshTorchBtn();
     currentDeviceId = deviceId;
-    // Allow 1 s for auto-exposure to stabilise after the torch fires / stream opens.
+    // Allow 2 s for auto-exposure to stabilise after the torch fires / stream opens.
     // processFrame will skip diff detection and frame sends until this window passes.
     // E2E tests inject window.__skipCamSettle=true (synthetic_camera.js) to bypass this.
-    _camSettleUntil = window.__skipCamSettle ? 0 : Date.now() + 1000;
+    _camSettleUntil = window.__skipCamSettle ? 0 : Date.now() + 2000;
     settleFired = false;
     lastMotionFrame = frameSeq;  // discard any motion that accumulated during the switch
+    // Reset the motion detector baseline so the first diff after the settle window is
+    // computed against the post-AE frame, not the bright pre-switch/pre-torch frame.
+    // Without this, the large brightness delta triggers a false inMotion spike and can
+    // cause uploadSettledFrame to fire with a still-blown-out frame.
+    motionDetector.reset();
   }
 
   // ── Torch ─────────────────────────────────────────────────────────────────
