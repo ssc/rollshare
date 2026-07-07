@@ -594,7 +594,7 @@
   var MOTION_THRESHOLD_MIN        = 3;
   var MOTION_THRESHOLD_MULTIPLIER = 2.0;
   var MOTION_NOISE_EMA_ALPHA      = 0.02;
-  var JUST_SETTLED_DELAY_FRAMES   = 4;
+  var JUST_SETTLED_DELAY_FRAMES   = 7;  // raised from 4 — ~0.58s at 12fps; prevents capturing a die still spinning in place
   var GRAB_SPIKE_WINDOW           = 20;
   var GRAB_THRESHOLD              = 5.0;
 
@@ -620,6 +620,7 @@
   MotionDetector.prototype.update = function (gray) {
     var diffMean = 0;
     this.threshold = Math.max(MOTION_THRESHOLD_MIN, this.noiseEma * MOTION_THRESHOLD_MULTIPLIER);
+    var inMotion = false;
     if (this.prevGray) {
       var sum = 0;
       for (var i = 0; i < gray.length; i++) sum += Math.abs(gray[i] - this.prevGray[i]);
@@ -627,6 +628,27 @@
       if (diffMean < this.threshold)
         this.noiseEma = MOTION_NOISE_EMA_ALPHA * diffMean + (1 - MOTION_NOISE_EMA_ALPHA) * this.noiseEma;
       this.threshold = Math.max(MOTION_THRESHOLD_MIN, this.noiseEma * MOTION_THRESHOLD_MULTIPLIER);
+      inMotion = diffMean > this.threshold;
+      // Center-patch motion check — inner 4×4 of a 6×6 grid over the 160×120 small frame.
+      // Each patch is 26×20 px. The outer border ring (col/row 0 and 5) is skipped to avoid
+      // false positives from tray edges, corner shadows, and autofocus drift.  A single die
+      // spinning in place whose global mean is diluted (~0.8) will hot at least one inner
+      // patch (~30) and keep the motion flag live until it truly stops.
+      if (!inMotion) {
+        var _pw = 26, _ph = 20;  // floor(160/6), floor(120/6)
+        outerPatch: for (var _gr = 1; _gr <= 4; _gr++) {
+          for (var _gc = 1; _gc <= 4; _gc++) {
+            var _x0 = _gc * _pw, _y0 = _gr * _ph;
+            var _psum = 0;
+            for (var _py = _y0; _py < _y0 + _ph; _py++) {
+              for (var _px = _x0; _px < _x0 + _pw; _px++) {
+                _psum += Math.abs(gray[_py * 160 + _px] - this.prevGray[_py * 160 + _px]);
+              }
+            }
+            if (_psum / (_pw * _ph) > this.threshold) { inMotion = true; break outerPatch; }
+          }
+        }
+      }
     }
     this.prevGray = gray.slice();
     var MAX_HIST = 300;
@@ -634,7 +656,7 @@
     this.history.push(diffMean);
     this.threshHist.push(this.threshold);
     this.settleHist.push(null);  // filled in by processFrame on settle
-    return { inMotion: diffMean > this.threshold, diff_mean: diffMean };
+    return { inMotion: inMotion, diff_mean: diffMean };
   };
   MotionDetector.prototype.markSettle = function (peak) {
     if (this.settleHist.length) this.settleHist[this.settleHist.length - 1] = peak;
@@ -649,9 +671,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = '1.0.96';
-  var GIT_COMMIT     = '77b088a';
-  var BUILD_TIME     = '2026-07-06 18:40 UTC';
+  var APP_VERSION    = '1.0.97';
+  var GIT_COMMIT     = '598910b';
+  var BUILD_TIME     = '2026-07-07 16:16 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1370,7 +1392,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.96', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.97', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // companion_hello = Companion is live. Dismiss any zombie overlay.
             if (document.getElementById('zombie-overlay')) {
@@ -2054,7 +2076,7 @@
   // Stamp version into status bar (always, not just when autostart)
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== '1.0.96') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== '1.0.97') v.textContent = 'v' + APP_VERSION;
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');
