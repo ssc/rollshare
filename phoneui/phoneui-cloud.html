@@ -594,7 +594,7 @@
   var MOTION_THRESHOLD_MIN        = 3;
   var MOTION_THRESHOLD_MULTIPLIER = 2.0;
   var MOTION_NOISE_EMA_ALPHA      = 0.02;
-  var JUST_SETTLED_DELAY_FRAMES   = 7;  // raised from 4 — ~0.58s at 12fps; prevents capturing a die still spinning in place
+  var JUST_SETTLED_DELAY_FRAMES   = 5;  // ~0.42s at 12fps; was 7 (too cautious), was 4 (too fast)
   var GRAB_SPIKE_WINDOW           = 20;
   var GRAB_THRESHOLD              = 5.0;
 
@@ -672,8 +672,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.97';
-  var GIT_COMMIT     = '598910b';
-  var BUILD_TIME     = '2026-07-07 16:16 UTC';
+  var GIT_COMMIT     = 'f273aa8';
+  var BUILD_TIME     = '2026-07-08 20:36 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
