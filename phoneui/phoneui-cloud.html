@@ -671,9 +671,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = '1.0.97';
-  var GIT_COMMIT     = 'f273aa8';
-  var BUILD_TIME     = '2026-07-08 20:36 UTC';
+  var APP_VERSION    = '1.0.99';
+  var GIT_COMMIT     = '7eeb9f9';
+  var BUILD_TIME     = '2026-07-08 23:54 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1392,7 +1392,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.97', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.99', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // companion_hello = Companion is live. Dismiss any zombie overlay.
             if (document.getElementById('zombie-overlay')) {
@@ -2076,7 +2076,7 @@
   // Stamp version into status bar (always, not just when autostart)
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== '1.0.97') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== '1.0.99') v.textContent = 'v' + APP_VERSION;
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');
