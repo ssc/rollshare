@@ -382,8 +382,10 @@
     #rotate-toggle-btn .btn-icon { font-size: 1.4rem; }
     #rotate-toggle-btn .btn-label { font-size: 0.72rem; white-space: nowrap; display: inline-block; transition: transform 0.2s; }
     body.page-inverted #rotate-toggle-btn .btn-label { transform: rotate(180deg); }
-    /* devmode floating button — right side of bottom tray */
-    #devmode-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #f97316; background: rgba(30,20,10,0.85); color: #f97316; font-size: 1.4rem; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    /* devmode floating button — right side of bottom tray, matches Flip Screen pill style */
+    #devmode-toggle-btn { height: 2.6rem; border-radius: 1.3rem; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0 0.85rem; gap: 0.35rem; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); font-size: inherit; }
+    #devmode-toggle-btn .btn-icon { font-size: 1.4rem; }
+    #devmode-toggle-btn .btn-label { font-size: 0.72rem; white-space: nowrap; }
     /* devmode overlay panel */
     #devmode-panel {
       display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10000;
@@ -575,8 +577,8 @@
         localStorage.setItem('rs_invert_angle', String(inv));
     }
   })()"><span class="btn-icon">&#8645;</span><span class="btn-label">Flip Screen</span></button>
-  <!-- devmode toggle: shown by IIFE when ?dev=1; harmless hidden button on production -->
-  <button id="devmode-toggle-btn" title="Toggle dev panel">⚙</button>
+  <!-- devmode toggle: shown by IIFE when ?dev=1 or by debugMode block; right side of tray -->
+  <button id="devmode-toggle-btn" title="Toggle debug log panel"><span class="btn-icon">⚙</span><span class="btn-label">Debug Log</span></button>
 </div>
 
 <div id="tap-overlay">
@@ -671,9 +673,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = '1.0.99';
-  var GIT_COMMIT     = '7eeb9f9';
-  var BUILD_TIME     = '2026-07-09 02:27 UTC';
+  var APP_VERSION    = '1.0.105';
+  var GIT_COMMIT     = '4c014b2';
+  var BUILD_TIME     = '2026-07-15 17:34 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1392,7 +1394,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.99', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.105', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // companion_hello = Companion is live. Dismiss any zombie overlay.
             if (document.getElementById('zombie-overlay')) {
@@ -1462,6 +1464,28 @@
           })
           .subscribe(function (status) {
             dbg('broadcast channel status: ' + status);
+            console.log('[rs-phoneui] channel status=' + status + ' key=...' + activeRendezvousKey.slice(-8) +
+              ' friendMode=' + isFriendMode + ' friendAssigned=' + friendAssigned);
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+              // Supabase WS subscription failed or dropped.  Log clearly and schedule a
+              // reconnect so the phone doesn't silently stall.
+              var _retryDelay = status === 'TIMED_OUT' ? 3000 : 5000;
+              dbg('channel ' + status + ' — will retry in ' + (_retryDelay / 1000) + 's', 'warn');
+              console.warn('[rs-phoneui] channel ' + status + ' on key=...' + activeRendezvousKey.slice(-8) +
+                ' — retrying in ' + (_retryDelay / 1000) + 's');
+              // Clear any pending friend_hello retry so we don't double-fire on reconnect.
+              if (typeof window._friendHelloRetryId !== 'undefined' && window._friendHelloRetryId !== null) {
+                clearInterval(window._friendHelloRetryId);
+                window._friendHelloRetryId = null;
+              }
+              setTimeout(function () {
+                if (!friendAssigned) {
+                  dbg('retrying channel subscription after ' + status);
+                  initSupabase(true);
+                }
+              }, _retryDelay);
+              return;
+            }
             if (status === 'SUBSCRIBED') {
               // If we were in zombie/reconnect state, dismiss the overlay
               _dismissZombieOverlay();
@@ -1521,6 +1545,36 @@
               if (isFriendMode) {
                 if (!friendAssigned) {
                   setStatus('\uD83D\uDD17', 'Friend Broker', 'Waiting for companion to assign your private channel\u2026');
+                  // Retry friend_hello every 5 s in case Companion's broker channel wasn't
+                  // connected yet when we first sent it (race on slower/cold networks).
+                  if (typeof window._friendHelloRetryId === 'undefined') window._friendHelloRetryId = null;
+                  if (window._friendHelloRetryId !== null) clearInterval(window._friendHelloRetryId);
+                  var _friendHelloAttempt = 0;
+                  window._friendHelloRetryId = setInterval(function () {
+                    if (friendAssigned || !isFriendMode) {
+                      clearInterval(window._friendHelloRetryId);
+                      window._friendHelloRetryId = null;
+                      return;
+                    }
+                    _friendHelloAttempt++;
+                    dbg('friend_hello retry #' + _friendHelloAttempt + ' (no friend_assign yet)', 'warn');
+                    console.log('[rs-phoneui] friend_hello retry #' + _friendHelloAttempt +
+                      ' key=...' + activeRendezvousKey.slice(-8));
+                    if (broadcastChannel) {
+                      broadcastChannel.send({
+                        type: 'broadcast', event: 'friend_hello',
+                        payload: _helloPayload(),
+                      }).catch(function () {});
+                    }
+                    // After 4 retries (~20 s total) force a full channel reconnect.
+                    if (_friendHelloAttempt >= 4) {
+                      clearInterval(window._friendHelloRetryId);
+                      window._friendHelloRetryId = null;
+                      dbg('friend_hello: no response after 4 retries — reconnecting channel', 'warn');
+                      console.warn('[rs-phoneui] friend_hello: no response after 4 retries — reconnecting channel');
+                      initSupabase(true);
+                    }
+                  }, 5000);
                 } else {
                   // Now on private channel — send pending metadata that was held back
                   if (cameraStarted) _sendCamLabel();
@@ -1782,23 +1836,23 @@
   var debugMode = /[?&]debug=1/.test(window.location.search);
   if (debugMode) {
     dbgPanel.classList.add('visible');
-    var _mgWrap = document.getElementById('motion-graph-wrap');
-    if (_mgWrap) _mgWrap.classList.add('visible');
-    var _cpvWrap = document.getElementById('canvas-preview-wrap');
-    if (_cpvWrap) _cpvWrap.classList.add('visible');
-    // Open the combined panel and show the toggle button so the user can
-    // dismiss/re-open it. The ⚙ button is normally only shown when isDev
-    // (handled in the IIFE below); show it here for debug-only sessions too.
-    var _dmPanel = document.getElementById('devmode-panel');
-    if (_dmPanel) {
-      _dmPanel.classList.add('open');
-      // Defer height sync one frame so the panel has rendered before we measure.
-      requestAnimationFrame(function () {
-        document.documentElement.style.setProperty('--devpanel-h', _dmPanel.offsetHeight + 'px');
-      });
-    }
+    // In debug=1 mode (without dev=1) keep the devmode panel CLOSED by default so
+    // it doesn't cover the Start Camera button on phones.  The ⚙ toggle button is
+    // shown so the user can manually open it after the camera is running.
+    // (When dev=1 is also set the devmode IIFE opens the panel itself as usual.)
     var _devBtn = document.getElementById('devmode-toggle-btn');
-    if (_devBtn) _devBtn.style.display = 'flex';
+    if (_devBtn) {
+      _devBtn.style.display = 'flex';
+      // Wire up toggle only when the devmode IIFE hasn't already done it (no ?dev=1).
+      if (!_devBtn.onclick) {
+        _devBtn.onclick = function () {
+          var _p = document.getElementById('devmode-panel');
+          _p.classList.toggle('open');
+          var _h = _p.classList.contains('open') ? _p.offsetHeight : 0;
+          document.documentElement.style.setProperty('--devpanel-h', _h + 'px');
+        };
+      }
+    }
   }
   // Log version immediately so it appears at the top of the debug panel
   // (broadcastChannel not yet open here, so console-only)
@@ -2076,7 +2130,7 @@
   // Stamp version into status bar (always, not just when autostart)
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== '1.0.99') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== '1.0.105') v.textContent = 'v' + APP_VERSION;
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');
