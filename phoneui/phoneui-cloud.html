@@ -588,6 +588,7 @@
   <span class="tap-sub">Camera will start immediately</span>
 </div>
 <div id="inline-status" style="display:none"></div>
+<div id="dbg-panel" aria-label="Debug log"></div>
 
 <script>
 (function () {
@@ -675,8 +676,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.105';
-  var GIT_COMMIT     = '2b77346';
-  var BUILD_TIME     = '2026-07-15 17:59 UTC';
+  var GIT_COMMIT     = 'f9c1eaa';
+  var BUILD_TIME     = '2026-07-15 18:15 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1836,7 +1837,7 @@
   var dbgPanel = document.getElementById('dbg-panel');
   var debugMode = /[?&]debug=1/.test(window.location.search);
   if (debugMode) {
-    dbgPanel.classList.add('visible');
+    if (dbgPanel) dbgPanel.classList.add('visible');
     // In debug=1 mode (without dev=1) keep the devmode panel CLOSED by default so
     // it doesn't cover the Start Camera button on phones.  The ⚙ toggle button is
     // shown so the user can manually open it after the camera is running.
@@ -1848,9 +1849,15 @@
       if (!_devBtn.onclick) {
         _devBtn.onclick = function () {
           var _p = document.getElementById('devmode-panel');
-          _p.classList.toggle('open');
-          var _h = _p.classList.contains('open') ? _p.offsetHeight : 0;
-          document.documentElement.style.setProperty('--devpanel-h', _h + 'px');
+          if (_p) {
+            // dev=1 mode: full devmode panel
+            _p.classList.toggle('open');
+            var _h = _p.classList.contains('open') ? _p.offsetHeight : 0;
+            document.documentElement.style.setProperty('--devpanel-h', _h + 'px');
+          } else if (dbgPanel) {
+            // debug=1 only (production): toggle the log panel directly
+            dbgPanel.classList.toggle('visible');
+          }
         };
       }
     }
@@ -1861,10 +1868,12 @@
   if (debugMode) {
     var _badge = document.getElementById('ver-badge');
     if (_badge) { _badge.textContent = GIT_COMMIT; _badge.style.display = 'inline'; }
-    var _verEl = document.createElement('div');
-    _verEl.style.color = '#86efac';
-    _verEl.textContent = 'phoneui-cloud v' + APP_VERSION + '  ' + BUILD_TIME;
-    dbgPanel.appendChild(_verEl);
+    if (dbgPanel) {
+      var _verEl = document.createElement('div');
+      _verEl.style.color = '#86efac';
+      _verEl.textContent = 'phoneui-cloud v' + APP_VERSION + '  ' + BUILD_TIME;
+      dbgPanel.appendChild(_verEl);
+    }
   }
   var _remoteLogSeq = 0;
   function dbg(msg, level) {
