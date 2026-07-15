@@ -675,9 +675,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = '1.0.105';
-  var GIT_COMMIT     = 'f9c1eaa';
-  var BUILD_TIME     = '2026-07-15 19:27 UTC';
+  var APP_VERSION    = '1.0.108';
+  var GIT_COMMIT     = 'c11ea77';
+  var BUILD_TIME     = '2026-07-15 22:17 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -942,11 +942,14 @@
   // Reset button (allowing the user to re-enter the wizard).
   var _friendCalibDone = false;  // true once host signals done:true
 
+  var _hostYoloOnly = false;  // true when host is in yolo-only mode (no calibration needed)
+
   function _updateCalibBanner() {
     var banner = document.getElementById('calib-banner');
     if (!banner) return;
-    // Only show the banner (with Reset button) once calibration is complete.
-    banner.style.display = ((isFriendMode || _isFriendReconnect) && _friendCalibDone) ? 'flex' : 'none';
+    // Only show the banner (with Reset button) once calibration is complete,
+    // and only when the host is NOT in yolo-only mode (which skips calibration entirely).
+    banner.style.display = ((isFriendMode || _isFriendReconnect) && _friendCalibDone && !_hostYoloOnly) ? 'flex' : 'none';
   }
 
   // Initialise calibration state (call after isFriendMode / _isFriendReconnect is known)
@@ -1396,7 +1399,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.105', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.108', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // companion_hello = Companion is live. Dismiss any zombie overlay.
             if (document.getElementById('zombie-overlay')) {
@@ -1458,7 +1461,8 @@
             var bcast = (payload && payload.payload) || payload || {};
             var wasDone = _friendCalibDone;
             _friendCalibDone = !!bcast.done;
-            dbg('calib_progress: done=' + _friendCalibDone);
+            if (bcast.yolo_only !== undefined) _hostYoloOnly = !!bcast.yolo_only;
+            dbg('calib_progress: done=' + _friendCalibDone + ' yolo_only=' + _hostYoloOnly);
             _updateCalibBanner();
             if (_friendCalibDone && !wasDone && !isDev) {
               try { posthog.capture('friend_calib_complete', { rendezvous_short: activeRendezvousKey.slice(-6) }); } catch(_) {}
@@ -2142,7 +2146,7 @@
   // Stamp version into status bar (always, not just when autostart)
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== '1.0.105') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== '1.0.108') v.textContent = 'v' + APP_VERSION;
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');
