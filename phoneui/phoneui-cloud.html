@@ -676,8 +676,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.108';
-  var GIT_COMMIT     = '17de60b';
-  var BUILD_TIME     = '2026-07-15 23:14 UTC';
+  var GIT_COMMIT     = 'ea87c08';
+  var BUILD_TIME     = '2026-07-15 23:47 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -2229,10 +2229,15 @@
   })();
 
   // ── Tab/window close: notify Companion ───────────────────────────────────
-  // pagehide is the most reliable close signal on mobile (fires on iOS Safari
-  // when the tab is swiped away; beforeunload often doesn't). Presence leave
-  // is the server-side fallback and handles ungraceful kills.
-  window.addEventListener('pagehide', function () {
+  // pagehide is the most reliable close signal on iOS Safari (fires when the
+  // tab is swiped away; beforeunload often doesn't).
+  // visibilitychange→hidden is the most reliable signal on Android Chrome —
+  // pagehide often doesn't fire when a Chrome tab is closed on Android.
+  // Both send bye + untrack presence so companion clears the pip immediately
+  // regardless of platform.  Untracking presence is the critical path: even
+  // if the broadcast send fails, Supabase removes the phone's presence entry
+  // as soon as the WS closes, triggering a presence_diff leave on companion.
+  function _sendByeAndUntrack() {
     if (broadcastChannel) {
       try {
         broadcastChannel.send({
@@ -2240,6 +2245,13 @@
           payload: { type: 'bye' },
         });
       } catch (_) {}
+      try { broadcastChannel.untrack(); } catch (_) {}
+    }
+  }
+  window.addEventListener('pagehide', _sendByeAndUntrack, { capture: true });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') {
+      _sendByeAndUntrack();
     }
   }, { capture: true });
 
