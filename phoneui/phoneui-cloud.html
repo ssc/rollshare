@@ -676,8 +676,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.108';
-  var GIT_COMMIT     = 'c11ea77';
-  var BUILD_TIME     = '2026-07-15 22:17 UTC';
+  var GIT_COMMIT     = 'e477411';
+  var BUILD_TIME     = '2026-07-15 22:43 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1493,8 +1493,10 @@
               return;
             }
             if (status === 'SUBSCRIBED') {
-              // If we were in zombie/reconnect state, dismiss the overlay
-              _dismissZombieOverlay();
+              // Do NOT dismiss zombie unconditionally here — presence sync/join confirm
+              // companion is actually present before dismissing.  Blindly dismissing on
+              // SUBSCRIBED was causing phones to falsely show "reconnected" when companion
+              // was still gone but the phone's own Supabase WS blinked and re-subscribed.
               // Track phone presence so Companion can also see subscriber count
               broadcastChannel.track({ user: 'phone' });
               // Send hello so Companion can confirm bidirectional comms and log device info
@@ -1519,7 +1521,8 @@
               }
               // Friend reconnect tab: auto-start the camera so the user doesn't need to
               // manually tap Start after a tab reload (mirrors zombie overlay auto-start).
-              if (_isFriendReconnect && !cameraStarted) {
+              // Guard: don't auto-start if zombie is showing — companion may still be gone.
+              if (_isFriendReconnect && !cameraStarted && !document.getElementById('zombie-overlay')) {
                 setStatus('\uD83D\uDD04', 'Reconnecting…', 'Friend session restoring');
                 setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 400);
               }
