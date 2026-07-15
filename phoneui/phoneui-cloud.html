@@ -676,8 +676,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.108';
-  var GIT_COMMIT     = 'bebe901';
-  var BUILD_TIME     = '2026-07-15 23:00 UTC';
+  var GIT_COMMIT     = '17de60b';
+  var BUILD_TIME     = '2026-07-15 23:14 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -911,6 +911,7 @@
   var motionDetector  = new MotionDetector();
   var supabase        = null;
   var broadcastChannel = null;   // Supabase Realtime broadcast channel
+  var _companionEverPresent = false; // true once companion presence confirmed this session
   var _cachedGeoLat = null;       // cached from geolocation; re-sent on private channel connect
   var _cachedGeoLon = null;
   var currentStream   = null;
@@ -1331,6 +1332,7 @@
                 return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
               });
               if (_companionPresent) {
+                _companionEverPresent = true;
                 dbg('presence sync: companion present — re-tracking and re-sending hello');
                 broadcastChannel.track({ user: 'phone' });
                 broadcastChannel.send({
@@ -1341,9 +1343,11 @@
                   _dismissZombieOverlay();
                   if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
                 }
-              } else if (cameraStarted && !isShim) {
+              } else if (cameraStarted && !isShim && _companionEverPresent) {
                 // Synced but companion is not present and camera is running — companion
                 // went away without us seeing a leave event (silent WS drop on our side).
+                // Guard: only fire if companion was previously seen (avoids false zombie
+                // in test environments or fresh sessions without companion yet).
                 dbg('presence sync: companion absent while camera running — showing zombie', 'warn');
                 _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
               }
@@ -1354,16 +1358,20 @@
             var joined = (payload && payload.newPresences) || [];
             var companionJoined = joined.some(function (p) { return p.user === 'companion'; });
             if (companionJoined) {
+              _companionEverPresent = true;
               // Re-track and re-send hello when companion joins/rejoins.
               // On the broker channel, only re-send if we haven't been assigned yet AND
               // this is a rejoin (zombie recovery) — not on first join since SUBSCRIBED
               // already sent friend_hello. On the private channel always re-send.
               broadcastChannel.track({ user: 'phone' });
-              if (friendAssigned || isFriendMode || document.getElementById('zombie-overlay')) {
-                // friendAssigned  → private channel: always re-send hello.
-                // isFriendMode    → still on broker, not yet assigned: re-send friend_hello
-                //                   so Companion can issue a fresh friend_assign after restart.
-                // zombie-overlay  → primary path recovery: re-send hello.
+              if (friendAssigned || isFriendMode || document.getElementById('zombie-overlay')
+                  || (!isFriendMode && cameraStarted)) {
+                // friendAssigned         → private channel: always re-send hello.
+                // isFriendMode          → still on broker, not yet assigned: re-send friend_hello
+                //                         so Companion can issue a fresh friend_assign after restart.
+                // zombie-overlay        → primary path recovery: re-send hello.
+                // primary + cameraStarted → quick restart: no zombie was shown but session is
+                //                           stale; re-introduce so Companion knows we're here.
                 broadcastChannel.send({
                   type: 'broadcast', event: _helloEventName(),
                   payload: _helloPayload(),
@@ -1414,6 +1422,7 @@
                 });
               } catch (_) {}
               if (_cpConfirmed) {
+                _companionEverPresent = true;
                 dbg('companion_hello: presence confirmed — dismissing zombie overlay');
                 _dismissZombieOverlay();
                 if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
@@ -1425,7 +1434,9 @@
             // Python connection race. Do NOT re-send friend_hello on the broker channel
             // — the SUBSCRIBED handler already sent it, and re-sending creates duplicate
             // breakout channels.
-            if (broadcastChannel && friendAssigned) {
+            // Also re-send for primary (no friend mode) when camera is already running so
+            // companion can reconnect after a quick restart that didn't trigger a zombie.
+            if (broadcastChannel && (friendAssigned || (!isFriendMode && cameraStarted))) {
               broadcastChannel.send({
                 type: 'broadcast', event: _helloEventName(),
                 payload: _helloPayload(),
@@ -1541,8 +1552,9 @@
                 setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 400);
               }
               // ── Periodic presence watchdog ─────────────────────────────────────────
-              // Poll every 10 s.  If companion is absent and camera is running, the WS
-              // likely dropped silently without firing a leave/sync event.
+              // Poll every 4 s.  If companion is absent and camera is running, the WS
+              // likely dropped silently without firing a leave/sync event (hard kill,
+              // crash, or quick restart that outran presence propagation).
               // Skipped in shim/relay mode — relay doesn't support Supabase Presence so
               // presenceState() always returns {} and would false-fire immediately.
               if (typeof window._presenceWatchdogId === 'undefined') window._presenceWatchdogId = null;
@@ -1551,6 +1563,7 @@
                 window._presenceWatchdogId = setInterval(function () {
                   if (document.getElementById('zombie-overlay')) return; // already showing
                   if (!cameraStarted) return; // no active session to watch
+                  if (!_companionEverPresent) return; // never connected — don't false-fire
                   try {
                     var _wps = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
                     var _wcp = Object.values(_wps).some(function(pp) {
@@ -1561,7 +1574,7 @@
                       _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
                     }
                   } catch (_) {}
-                }, 10000);
+                }, 4000);
               }
               // Friend mode: update status to reflect which channel phase we're in, and
               // flush cam_label + geo that were blocked while on the broker channel.
