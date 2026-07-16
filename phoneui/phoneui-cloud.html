@@ -675,9 +675,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = '1.0.108';
-  var GIT_COMMIT     = '8647647';
-  var BUILD_TIME     = '2026-07-16 00:33 UTC';
+  var APP_VERSION    = '1.0.109';
+  var GIT_COMMIT     = '0d44dce';
+  var BUILD_TIME     = '2026-07-16 01:07 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1407,7 +1407,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.108', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.0.109', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // companion_hello = Companion is live. Dismiss zombie overlay only if companion
             // presence is also confirmed — guards against a briefly-lived companion restart
@@ -2201,7 +2201,7 @@
   // Stamp version into status bar (always, not just when autostart)
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== '1.0.108') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== '1.0.109') v.textContent = 'v' + APP_VERSION;
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');
