@@ -676,8 +676,8 @@
 
   // ── Globals ───────────────────────────────────────────────────────────────
   var APP_VERSION    = '1.0.108';
-  var GIT_COMMIT     = 'ea87c08';
-  var BUILD_TIME     = '2026-07-15 23:47 UTC';
+  var GIT_COMMIT     = '8647647';
+  var BUILD_TIME     = '2026-07-16 00:33 UTC';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1427,7 +1427,32 @@
                 _dismissZombieOverlay();
                 if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
               } else {
-                dbg('companion_hello: presence not yet confirmed — deferring zombie dismiss to presence join', 'warn');
+                // Presence may not have synced yet (iOS Safari WS can lag behind broadcast).
+                // Poll up to 3 times at 500 ms intervals before giving up — presence join
+                // will also dismiss if it arrives independently.
+                dbg('companion_hello: presence not yet confirmed — polling...', 'warn');
+                var _pollCount = 0;
+                var _pollId = setInterval(function () {
+                  _pollCount++;
+                  if (!document.getElementById('zombie-overlay')) { clearInterval(_pollId); return; }
+                  var _pConfirmed = false;
+                  try {
+                    var _ps4 = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                    _pConfirmed = Object.values(_ps4).some(function(pp) {
+                      return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                    });
+                  } catch (_) {}
+                  if (_pConfirmed) {
+                    clearInterval(_pollId);
+                    _companionEverPresent = true;
+                    dbg('companion_hello: presence confirmed after poll #' + _pollCount + ' — dismissing zombie overlay');
+                    _dismissZombieOverlay();
+                    if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+                  } else if (_pollCount >= 3) {
+                    clearInterval(_pollId);
+                    dbg('companion_hello: presence still unconfirmed after ' + _pollCount + ' polls — deferring to presence join', 'warn');
+                  }
+                }, 500);
               }
             }
             // Re-send hello only on the private channel (friendAssigned) to handle the
@@ -2229,14 +2254,13 @@
   })();
 
   // ── Tab/window close: notify Companion ───────────────────────────────────
-  // pagehide is the most reliable close signal on iOS Safari (fires when the
-  // tab is swiped away; beforeunload often doesn't).
-  // visibilitychange→hidden is the most reliable signal on Android Chrome —
-  // pagehide often doesn't fire when a Chrome tab is closed on Android.
-  // Both send bye + untrack presence so companion clears the pip immediately
-  // regardless of platform.  Untracking presence is the critical path: even
-  // if the broadcast send fails, Supabase removes the phone's presence entry
-  // as soon as the WS closes, triggering a presence_diff leave on companion.
+  // pagehide fires reliably on iOS Safari (tab swipe-away, navigation).
+  // visibilitychange→hidden fires on Android Chrome when a tab is closed, but
+  // also fires on app-switch and screen-off — send bye only after a short delay
+  // and cancel if the page becomes visible again (app-switch / screen-back-on).
+  // Untracking presence on visibilitychange is always safe: Supabase re-tracks
+  // when the phone re-subscribes, and it avoids presence leaks on Android kills.
+  var _byeDelayId = null;
   function _sendByeAndUntrack() {
     if (broadcastChannel) {
       try {
@@ -2248,10 +2272,29 @@
       try { broadcastChannel.untrack(); } catch (_) {}
     }
   }
-  window.addEventListener('pagehide', _sendByeAndUntrack, { capture: true });
+  window.addEventListener('pagehide', function () {
+    if (_byeDelayId !== null) { clearTimeout(_byeDelayId); _byeDelayId = null; }
+    _sendByeAndUntrack();
+  }, { capture: true });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') {
-      _sendByeAndUntrack();
+      // Untrack immediately (cheap, self-corrects on re-visible).
+      if (broadcastChannel) { try { broadcastChannel.untrack(); } catch (_) {} }
+      // Delay the bye broadcast — if the page comes back visible within 3s
+      // (app-switch, screen-on) we cancel it to avoid a false disconnect.
+      if (_byeDelayId !== null) clearTimeout(_byeDelayId);
+      _byeDelayId = setTimeout(function () {
+        _byeDelayId = null;
+        if (document.visibilityState === 'hidden') {
+          if (broadcastChannel) {
+            try { broadcastChannel.send({ type: 'broadcast', event: 'bye', payload: { type: 'bye' } }); } catch (_) {}
+          }
+        }
+      }, 3000);
+    } else {
+      // Page became visible again — cancel pending bye and re-track presence.
+      if (_byeDelayId !== null) { clearTimeout(_byeDelayId); _byeDelayId = null; }
+      if (broadcastChannel) { try { broadcastChannel.track({ user: 'phone' }); } catch (_) {} }
     }
   }, { capture: true });
 
