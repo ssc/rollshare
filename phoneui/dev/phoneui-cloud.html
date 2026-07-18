@@ -736,7 +736,9 @@
   if (isFriendMode && rendezvousKey) {
     var _lsCheck = null;
     try { _lsCheck = localStorage.getItem('rs_friend_pk_' + rendezvousKey); } catch (_) {}
-    console.log('[rs-phoneui] localStorage private key for this broker: ' + (_lsCheck ? _lsCheck.slice(-8) : 'none'));
+    // P0-F: always forward to Companion log so we can see which path was taken
+    dbg('[startup] localStorage private key for broker ...'
+      + rendezvousKey.slice(-8) + ': ' + (_lsCheck ? '...' + _lsCheck.slice(-8) + ' (fast-path)' : 'none (broker flow)'), 'warn');
   }
   // 'reconnect=1' is set by _switchToFriendPrivateChannel via history.replaceState so
   // that when iOS kills and reloads the tab, the page knows it was a friend session
@@ -1355,6 +1357,11 @@
               });
               if (_companionPresent) {
                 dbg('presence sync: companion present — re-tracking and re-sending hello');
+                // Cancel broker-fallback timer: Companion is confirmed present.
+                if (window._brokerFallbackId != null) {
+                  clearTimeout(window._brokerFallbackId);
+                  window._brokerFallbackId = null;
+                }
                 broadcastChannel.track({ user: 'phone' });
                 broadcastChannel.send({
                   type: 'broadcast', event: _helloEventName(),
@@ -1377,6 +1384,12 @@
             var joined = (payload && payload.newPresences) || [];
             var companionJoined = joined.some(function (p) { return p.user === 'companion'; });
             if (companionJoined) {
+              // Cancel the broker-fallback timer: Companion is present, private channel is alive.
+              if (window._brokerFallbackId != null) {
+                clearTimeout(window._brokerFallbackId);
+                window._brokerFallbackId = null;
+                dbg('broker fallback timer cancelled (companion joined)', 'info');
+              }
               // Re-track and re-send hello when companion joins/rejoins.
               // On the broker channel, only re-send if we haven't been assigned yet AND
               // this is a rejoin (zombie recovery) — not on first join since SUBSCRIBED
@@ -1424,6 +1437,11 @@
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
             var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('__APP_VERSION__', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
+            // Cancel the broker-fallback timer: Companion is present.
+            if (window._brokerFallbackId != null) {
+              clearTimeout(window._brokerFallbackId);
+              window._brokerFallbackId = null;
+            }
             // companion_hello = Companion is live. Dismiss any zombie overlay.
             if (document.getElementById('zombie-overlay')) {
               dbg('companion_hello: dismissing zombie overlay');
@@ -1492,6 +1510,10 @@
           })
           .subscribe(function (status) {
             dbg('broadcast channel status: ' + status);
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              dbg('channel ' + status + ' -- Supabase will retry automatically', 'warn');
+              setStatus('\u26a0\ufe0f', 'Connection error', 'Retrying\u2026 (' + status + ')');
+            }
             if (status === 'SUBSCRIBED') {
               // If we were in zombie/reconnect state, dismiss the overlay
               _dismissZombieOverlay();
@@ -1522,6 +1544,51 @@
               if (_isFriendReconnect && !cameraStarted) {
                 setStatus('\uD83D\uDD04', 'Reconnecting…', 'Friend session restoring');
                 setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 400);
+              }
+              // Step 6: Private-channel broker fallback.
+              // If we are on a private channel (reconnect) but Companion is not present
+              // within 15 s of SUBSCRIBED, the channel is dead (Companion listener was
+              // cancelled). Clear the stale localStorage entry and reload on the broker
+              // URL so a fresh friend_assign is issued.
+              // HAPPY PATH: if Companion IS present within 15 s the timer is cancelled
+              // and the fast private-channel path is fully preserved.
+              if (_isFriendReconnect && !isShim) {
+                if (window._brokerFallbackId != null) clearTimeout(window._brokerFallbackId);
+                window._brokerFallbackId = setTimeout(function () {
+                  window._brokerFallbackId = null;
+                  try {
+                    var _fps = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                    var _fcp = Object.values(_fps).some(function(pp) {
+                      return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                    });
+                    // P0-G: log result so it appears in Companion logs
+                    dbg('reconnect 15s check: companion present=' + _fcp
+                      + ' key=...' + activeRendezvousKey.slice(-8), _fcp ? 'info' : 'warn');
+                    if (!_fcp) {
+                      // Dead private channel -- clear stale key and fall back to broker.
+                      try {
+                        for (var _ki = localStorage.length - 1; _ki >= 0; _ki--) {
+                          var _kk = localStorage.key(_ki);
+                          if (_kk && _kk.indexOf(_LS_FRIEND_KEY_PREFIX) === 0) {
+                            if (localStorage.getItem(_kk) === activeRendezvousKey) {
+                              localStorage.removeItem(_kk);
+                              localStorage.removeItem(_kk + '_name');
+                              dbg('broker fallback: cleared stale localStorage ' + _kk, 'warn');
+                            }
+                          }
+                        }
+                      } catch (_) {}
+                      var _brokerKey = rendezvousKey;
+                      if (_brokerKey) {
+                        dbg('broker fallback: reloading on broker URL ...' + _brokerKey.slice(-8), 'warn');
+                        var _bfp = new URLSearchParams();
+                        _bfp.set('s', _brokerKey);
+                        _bfp.set('friend', '1');
+                        window.location.href = window.location.pathname + '?' + _bfp.toString();
+                      }
+                    }
+                  } catch (_) {}
+                }, 15000);
               }
               // ── Periodic presence watchdog ─────────────────────────────────────────
               // Poll every 10 s.  If companion is absent and camera is running, the WS
@@ -2377,6 +2444,7 @@
   // when the tab is swiped away; beforeunload often doesn't). Presence leave
   // is the server-side fallback and handles ungraceful kills.
   window.addEventListener('pagehide', function () {
+    dbg('pagehide: sending bye', 'warn');
     if (broadcastChannel) {
       try {
         broadcastChannel.send({
