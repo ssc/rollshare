@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -701,9 +701,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = '__APP_VERSION__';
-  var GIT_COMMIT     = '__GIT_COMMIT__';
-  var BUILD_TIME     = '__BUILD_TIME__';
+  var APP_VERSION    = 'dev-20260718-1655';
+  var GIT_COMMIT     = '8fb4064';
+  var BUILD_TIME     = '2026-07-18T16:55:01Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1435,7 +1435,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('__APP_VERSION__', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260718-1655', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
@@ -2165,7 +2165,7 @@
   // Stamp version into status bar (always, not just when autostart)
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== '__APP_VERSION__') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260718-1655') v.textContent = 'v' + APP_VERSION;
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');
