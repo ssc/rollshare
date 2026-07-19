@@ -79,6 +79,7 @@
       letter-spacing: 0.02em;
       line-height: 1;
     }
+    #ver-badge { display: none; font-family: monospace; font-size: 0.62rem; color: #86efac; opacity: 0.75; vertical-align: middle; font-weight: 400; }
 
     #error-banner {
       display: none;
@@ -382,8 +383,10 @@
     #rotate-toggle-btn .btn-icon { font-size: 1.4rem; }
     #rotate-toggle-btn .btn-label { font-size: 0.72rem; white-space: nowrap; display: inline-block; transition: transform 0.2s; }
     body.page-inverted #rotate-toggle-btn .btn-label { transform: rotate(180deg); }
-    /* devmode floating button — right side of bottom tray */
-    #devmode-toggle-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid #f97316; background: rgba(30,20,10,0.85); color: #f97316; font-size: 1.4rem; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    /* devmode floating button — right side of bottom tray, matches Flip Screen pill style */
+    #devmode-toggle-btn { height: 2.6rem; border-radius: 1.3rem; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0 0.85rem; gap: 0.35rem; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); font-size: inherit; }
+    #devmode-toggle-btn .btn-icon { font-size: 1.4rem; }
+    #devmode-toggle-btn .btn-label { font-size: 0.72rem; white-space: nowrap; }
     /* devmode overlay panel */
     #devmode-panel {
       display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10000;
@@ -461,8 +464,8 @@
 <header>
   <div class="header-title-row">
     <img src="../assets/rollshare_logo.png" alt="RollShare" />
-    <h1>RollShare</h1>
-    <div id="friend-mode-sub">friend mode</div>
+    <h1>RollShare <span id="ver-badge"></span></h1>
+    <div id="friend-mode-sub">friend mode <span id="ver-badge-friend"></span></div>
   </div>
   <p>Point phone down at the dice tray — <button id="info-btn" title="How to set up" aria-label="Setup info">how to set up?</button></p>
 </header>
@@ -575,8 +578,8 @@
         localStorage.setItem('rs_invert_angle', String(inv));
     }
   })()"><span class="btn-icon">&#8645;</span><span class="btn-label">Flip Screen</span></button>
-  <!-- devmode toggle: shown by IIFE when ?dev=1; harmless hidden button on production -->
-  <button id="devmode-toggle-btn" title="Toggle dev panel">⚙</button>
+  <!-- devmode toggle: shown by IIFE when ?dev=1 or by debugMode block; right side of tray -->
+  <button id="devmode-toggle-btn" title="Toggle debug log panel"><span class="btn-icon">⚙</span><span class="btn-label">Debug Log</span></button>
 </div>
 
 <div id="tap-overlay">
@@ -612,9 +615,9 @@
       </div>
     </div>
   </div>
-  <div id="dbg-panel" aria-label="Debug log"></div>
 </div>
 <!-- DEVMODE:END -->
+<div id="dbg-panel" aria-label="Debug log"></div>
 
 <script>
 (function () {
@@ -701,9 +704,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = 'dev-20260718-1655';
-  var GIT_COMMIT     = '8fb4064';
-  var BUILD_TIME     = '2026-07-18T16:55:01Z';
+  var APP_VERSION    = 'dev-20260718-2137';
+  var GIT_COMMIT     = '0c0eca4';
+  var BUILD_TIME     = '2026-07-18T21:37:35Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -939,6 +942,7 @@
   var motionDetector  = new MotionDetector();
   var supabase        = null;
   var broadcastChannel = null;   // Supabase Realtime broadcast channel
+  var _companionEverPresent = false; // true once companion presence confirmed this session
   var _cachedGeoLat = null;       // cached from geolocation; re-sent on private channel connect
   var _cachedGeoLon = null;
   var currentStream   = null;
@@ -970,11 +974,14 @@
   // Reset button (allowing the user to re-enter the wizard).
   var _friendCalibDone = false;  // true once host signals done:true
 
+  var _hostYoloOnly = false;  // true when host is in yolo-only mode (no calibration needed)
+
   function _updateCalibBanner() {
     var banner = document.getElementById('calib-banner');
     if (!banner) return;
-    // Only show the banner (with Reset button) once calibration is complete.
-    banner.style.display = ((isFriendMode || _isFriendReconnect) && _friendCalibDone) ? 'flex' : 'none';
+    // Only show the banner (with Reset button) once calibration is complete,
+    // and only when the host is NOT in yolo-only mode (which skips calibration entirely).
+    banner.style.display = ((isFriendMode || _isFriendReconnect) && _friendCalibDone && !_hostYoloOnly) ? 'flex' : 'none';
   }
 
   // Initialise calibration state (call after isFriendMode / _isFriendReconnect is known)
@@ -1356,6 +1363,7 @@
                 return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
               });
               if (_companionPresent) {
+                _companionEverPresent = true;
                 dbg('presence sync: companion present — re-tracking and re-sending hello');
                 // Cancel broker-fallback timer: Companion is confirmed present.
                 if (window._brokerFallbackId != null) {
@@ -1371,9 +1379,11 @@
                   _dismissZombieOverlay();
                   if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
                 }
-              } else if (cameraStarted && !isShim) {
+              } else if (cameraStarted && !isShim && _companionEverPresent) {
                 // Synced but companion is not present and camera is running — companion
                 // went away without us seeing a leave event (silent WS drop on our side).
+                // Guard: only fire if companion was previously seen (avoids false zombie
+                // in test environments or fresh sessions without companion yet).
                 dbg('presence sync: companion absent while camera running — showing zombie', 'warn');
                 _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
               }
@@ -1384,6 +1394,7 @@
             var joined = (payload && payload.newPresences) || [];
             var companionJoined = joined.some(function (p) { return p.user === 'companion'; });
             if (companionJoined) {
+              _companionEverPresent = true;
               // Cancel the broker-fallback timer: Companion is present, private channel is alive.
               if (window._brokerFallbackId != null) {
                 clearTimeout(window._brokerFallbackId);
@@ -1395,11 +1406,14 @@
               // this is a rejoin (zombie recovery) — not on first join since SUBSCRIBED
               // already sent friend_hello. On the private channel always re-send.
               broadcastChannel.track({ user: 'phone' });
-              if (friendAssigned || isFriendMode || document.getElementById('zombie-overlay')) {
-                // friendAssigned  → private channel: always re-send hello.
-                // isFriendMode    → still on broker, not yet assigned: re-send friend_hello
-                //                   so Companion can issue a fresh friend_assign after restart.
-                // zombie-overlay  → primary path recovery: re-send hello.
+              if (friendAssigned || isFriendMode || document.getElementById('zombie-overlay')
+                  || (!isFriendMode && cameraStarted)) {
+                // friendAssigned         → private channel: always re-send hello.
+                // isFriendMode          → still on broker, not yet assigned: re-send friend_hello
+                //                         so Companion can issue a fresh friend_assign after restart.
+                // zombie-overlay        → primary path recovery: re-send hello.
+                // primary + cameraStarted → quick restart: no zombie was shown but session is
+                //                           stale; re-introduce so Companion knows we're here.
                 broadcastChannel.send({
                   type: 'broadcast', event: _helloEventName(),
                   payload: _helloPayload(),
@@ -1435,24 +1449,66 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260718-1655', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260718-2137', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
               clearTimeout(window._brokerFallbackId);
               window._brokerFallbackId = null;
             }
-            // companion_hello = Companion is live. Dismiss any zombie overlay.
+            // companion_hello = Companion is live. Dismiss zombie overlay only if companion
+            // presence is also confirmed — guards against a briefly-lived companion restart
+            // that sends hello then crashes before presence is fully tracked.  If presence
+            // isn't here yet, the presence 'join' handler will dismiss as soon as it arrives.
             if (document.getElementById('zombie-overlay')) {
-              dbg('companion_hello: dismissing zombie overlay');
-              _dismissZombieOverlay();
-              if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+              var _cpConfirmed = false;
+              try {
+                var _ps3 = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                _cpConfirmed = Object.values(_ps3).some(function(pp) {
+                  return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                });
+              } catch (_) {}
+              if (_cpConfirmed) {
+                _companionEverPresent = true;
+                dbg('companion_hello: presence confirmed — dismissing zombie overlay');
+                _dismissZombieOverlay();
+                if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+              } else {
+                // Presence may not have synced yet (iOS Safari WS can lag behind broadcast).
+                // Poll up to 3 times at 500 ms intervals before giving up — presence join
+                // will also dismiss if it arrives independently.
+                dbg('companion_hello: presence not yet confirmed — polling...', 'warn');
+                var _pollCount = 0;
+                var _pollId = setInterval(function () {
+                  _pollCount++;
+                  if (!document.getElementById('zombie-overlay')) { clearInterval(_pollId); return; }
+                  var _pConfirmed = false;
+                  try {
+                    var _ps4 = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                    _pConfirmed = Object.values(_ps4).some(function(pp) {
+                      return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                    });
+                  } catch (_) {}
+                  if (_pConfirmed) {
+                    clearInterval(_pollId);
+                    _companionEverPresent = true;
+                    dbg('companion_hello: presence confirmed after poll #' + _pollCount + ' — dismissing zombie overlay');
+                    _dismissZombieOverlay();
+                    if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+                  } else if (_pollCount >= 3) {
+                    clearInterval(_pollId);
+                    dbg('companion_hello: presence still unconfirmed after ' + _pollCount + ' polls — deferring to presence join', 'warn');
+                  }
+                }, 500);
+              }
             }
             // Re-send hello only on the private channel (friendAssigned) to handle the
             // Python connection race. Do NOT re-send friend_hello on the broker channel
             // — the SUBSCRIBED handler already sent it, and re-sending creates duplicate
             // breakout channels.
-            if (broadcastChannel && friendAssigned) {
+            // Also re-send for primary (no friend mode) when camera is already running so
+            // companion can reconnect after a quick restart that didn't trigger a zombie.
+            if (broadcastChannel && (friendAssigned || (!isFriendMode && cameraStarted))) {
               broadcastChannel.send({
                 type: 'broadcast', event: _helloEventName(),
                 payload: _helloPayload(),
@@ -1502,7 +1558,8 @@
             var bcast = (payload && payload.payload) || payload || {};
             var wasDone = _friendCalibDone;
             _friendCalibDone = !!bcast.done;
-            dbg('calib_progress: done=' + _friendCalibDone);
+            if (bcast.yolo_only !== undefined) _hostYoloOnly = !!bcast.yolo_only;
+            dbg('calib_progress: done=' + _friendCalibDone + ' yolo_only=' + _hostYoloOnly);
             _updateCalibBanner();
             if (_friendCalibDone && !wasDone && !isDev) {
               try { posthog.capture('friend_calib_complete', { rendezvous_short: activeRendezvousKey.slice(-6) }); } catch(_) {}
@@ -1510,13 +1567,34 @@
           })
           .subscribe(function (status) {
             dbg('broadcast channel status: ' + status);
-            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              dbg('channel ' + status + ' -- Supabase will retry automatically', 'warn');
+            console.log('[rs-phoneui] channel status=' + status + ' key=...' + activeRendezvousKey.slice(-8) +
+              ' friendMode=' + isFriendMode + ' friendAssigned=' + friendAssigned);
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+              // Supabase WS subscription failed or dropped.  Log clearly and schedule a
+              // reconnect so the phone doesn't silently stall.
+              var _retryDelay = status === 'TIMED_OUT' ? 3000 : 5000;
+              dbg('channel ' + status + ' — will retry in ' + (_retryDelay / 1000) + 's', 'warn');
               setStatus('\u26a0\ufe0f', 'Connection error', 'Retrying\u2026 (' + status + ')');
+              console.warn('[rs-phoneui] channel ' + status + ' on key=...' + activeRendezvousKey.slice(-8) +
+                ' — retrying in ' + (_retryDelay / 1000) + 's');
+              // Clear any pending friend_hello retry so we don't double-fire on reconnect.
+              if (typeof window._friendHelloRetryId !== 'undefined' && window._friendHelloRetryId !== null) {
+                clearInterval(window._friendHelloRetryId);
+                window._friendHelloRetryId = null;
+              }
+              setTimeout(function () {
+                if (!friendAssigned) {
+                  dbg('retrying channel subscription after ' + status);
+                  initSupabase(true);
+                }
+              }, _retryDelay);
+              return;
             }
             if (status === 'SUBSCRIBED') {
-              // If we were in zombie/reconnect state, dismiss the overlay
-              _dismissZombieOverlay();
+              // Do NOT dismiss zombie unconditionally here — presence sync/join confirm
+              // companion is actually present before dismissing.  Blindly dismissing on
+              // SUBSCRIBED was causing phones to falsely show "reconnected" when companion
+              // was still gone but the phone's own Supabase WS blinked and re-subscribed.
               // Track phone presence so Companion can also see subscriber count
               broadcastChannel.track({ user: 'phone' });
               // Send hello so Companion can confirm bidirectional comms and log device info
@@ -1541,7 +1619,8 @@
               }
               // Friend reconnect tab: auto-start the camera so the user doesn't need to
               // manually tap Start after a tab reload (mirrors zombie overlay auto-start).
-              if (_isFriendReconnect && !cameraStarted) {
+              // Guard: don't auto-start if zombie is showing — companion may still be gone.
+              if (_isFriendReconnect && !cameraStarted && !document.getElementById('zombie-overlay')) {
                 setStatus('\uD83D\uDD04', 'Reconnecting…', 'Friend session restoring');
                 setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 400);
               }
@@ -1591,8 +1670,9 @@
                 }, 15000);
               }
               // ── Periodic presence watchdog ─────────────────────────────────────────
-              // Poll every 10 s.  If companion is absent and camera is running, the WS
-              // likely dropped silently without firing a leave/sync event.
+              // Poll every 4 s.  If companion is absent and camera is running, the WS
+              // likely dropped silently without firing a leave/sync event (hard kill,
+              // crash, or quick restart that outran presence propagation).
               // Skipped in shim/relay mode — relay doesn't support Supabase Presence so
               // presenceState() always returns {} and would false-fire immediately.
               if (typeof window._presenceWatchdogId === 'undefined') window._presenceWatchdogId = null;
@@ -1601,6 +1681,7 @@
                 window._presenceWatchdogId = setInterval(function () {
                   if (document.getElementById('zombie-overlay')) return; // already showing
                   if (!cameraStarted) return; // no active session to watch
+                  if (!_companionEverPresent) return; // never connected — don't false-fire
                   try {
                     var _wps = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
                     var _wcp = Object.values(_wps).some(function(pp) {
@@ -1611,13 +1692,43 @@
                       _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
                     }
                   } catch (_) {}
-                }, 10000);
+                }, 4000);
               }
               // Friend mode: update status to reflect which channel phase we're in, and
               // flush cam_label + geo that were blocked while on the broker channel.
               if (isFriendMode) {
                 if (!friendAssigned) {
                   setStatus('\uD83D\uDD17', 'Friend Broker', 'Waiting for companion to assign your private channel\u2026');
+                  // Retry friend_hello every 5 s in case Companion's broker channel wasn't
+                  // connected yet when we first sent it (race on slower/cold networks).
+                  if (typeof window._friendHelloRetryId === 'undefined') window._friendHelloRetryId = null;
+                  if (window._friendHelloRetryId !== null) clearInterval(window._friendHelloRetryId);
+                  var _friendHelloAttempt = 0;
+                  window._friendHelloRetryId = setInterval(function () {
+                    if (friendAssigned || !isFriendMode) {
+                      clearInterval(window._friendHelloRetryId);
+                      window._friendHelloRetryId = null;
+                      return;
+                    }
+                    _friendHelloAttempt++;
+                    dbg('friend_hello retry #' + _friendHelloAttempt + ' (no friend_assign yet)', 'warn');
+                    console.log('[rs-phoneui] friend_hello retry #' + _friendHelloAttempt +
+                      ' key=...' + activeRendezvousKey.slice(-8));
+                    if (broadcastChannel) {
+                      broadcastChannel.send({
+                        type: 'broadcast', event: 'friend_hello',
+                        payload: _helloPayload(),
+                      }).catch(function () {});
+                    }
+                    // After 4 retries (~20 s total) force a full channel reconnect.
+                    if (_friendHelloAttempt >= 4) {
+                      clearInterval(window._friendHelloRetryId);
+                      window._friendHelloRetryId = null;
+                      dbg('friend_hello: no response after 4 retries — reconnecting channel', 'warn');
+                      console.warn('[rs-phoneui] friend_hello: no response after 4 retries — reconnecting channel');
+                      initSupabase(true);
+                    }
+                  }, 5000);
                 } else {
                   // Now on private channel — send pending metadata that was held back
                   if (cameraStarted) _sendCamLabel();
@@ -1878,25 +1989,43 @@
   var dbgPanel = document.getElementById('dbg-panel');
   var debugMode = /[?&]debug=1/.test(window.location.search);
   if (debugMode) {
-    dbgPanel.classList.add('visible');
-    var _mgWrap = document.getElementById('motion-graph-wrap');
-    if (_mgWrap) _mgWrap.classList.add('visible');
-    var _cpvWrap = document.getElementById('canvas-preview-wrap');
-    if (_cpvWrap) _cpvWrap.classList.add('visible');
-    // Show the ⚙ toggle button so the user can open/close the panel.
-    // The panel itself starts CLOSED so it doesn't obscure the Start Camera
-    // button — the user taps the toggle to reveal graphs.
+    if (dbgPanel) dbgPanel.classList.add('visible');
+    // In debug=1 mode (without dev=1) keep the devmode panel CLOSED by default so
+    // it doesn't cover the Start Camera button on phones.  The ⚙ toggle button is
+    // shown so the user can manually open it after the camera is running.
+    // (When dev=1 is also set the devmode IIFE opens the panel itself as usual.)
     var _devBtn = document.getElementById('devmode-toggle-btn');
-    if (_devBtn) _devBtn.style.display = 'flex';
+    if (_devBtn) {
+      _devBtn.style.display = 'flex';
+      // Wire up toggle only when the devmode IIFE hasn't already done it (no ?dev=1).
+      if (!_devBtn.onclick) {
+        _devBtn.onclick = function () {
+          var _p = document.getElementById('devmode-panel');
+          if (_p) {
+            // dev=1 mode: full devmode panel
+            _p.classList.toggle('open');
+            var _h = _p.classList.contains('open') ? _p.offsetHeight : 0;
+            document.documentElement.style.setProperty('--devpanel-h', _h + 'px');
+          } else if (dbgPanel) {
+            // debug=1 only (production): toggle the log panel directly
+            dbgPanel.classList.toggle('visible');
+          }
+        };
+      }
+    }
   }
   // Log version immediately so it appears at the top of the debug panel
   // (broadcastChannel not yet open here, so console-only)
   console.log('[cloud] phoneui-cloud v' + APP_VERSION + ' (' + GIT_COMMIT + ') built ' + BUILD_TIME);
   if (debugMode) {
-    var _verEl = document.createElement('div');
-    _verEl.style.color = '#86efac';
-    _verEl.textContent = 'phoneui-cloud v' + APP_VERSION + '  ' + BUILD_TIME;
-    dbgPanel.appendChild(_verEl);
+    var _badge = document.getElementById('ver-badge');
+    if (_badge) { _badge.textContent = GIT_COMMIT; _badge.style.display = 'inline'; }
+    if (dbgPanel) {
+      var _verEl = document.createElement('div');
+      _verEl.style.color = '#86efac';
+      _verEl.textContent = 'phoneui-cloud v' + APP_VERSION + '  ' + BUILD_TIME;
+      dbgPanel.appendChild(_verEl);
+    }
   }
   var _remoteLogSeq = 0;
   function dbg(msg, level) {
@@ -2162,10 +2291,20 @@
   // opens the preview, not the full stream.
   // Pass ?noautostart=1 to suppress entirely (used by automated tests).
 
-  // Stamp version into status bar (always, not just when autostart)
+  // Stamp version into status bar and show git hash badge in debug mode
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== 'dev-20260718-1655') v.textContent = 'v' + APP_VERSION;
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260718-2137') {
+      v.textContent = 'v' + APP_VERSION;
+    }
+    if (debugMode && GIT_COMMIT && GIT_COMMIT !== '0c0eca4') {
+      // Primary mode: badge next to h1 title
+      var _badge = document.getElementById('ver-badge');
+      if (_badge) { _badge.textContent = GIT_COMMIT; _badge.style.display = 'inline'; }
+      // Friend mode: badge inside friend-mode-sub chip
+      var _badgeFriend = document.getElementById('ver-badge-friend');
+      if (_badgeFriend) { _badgeFriend.textContent = GIT_COMMIT; _badgeFriend.style.display = 'inline'; }
+    }
   })();
 
   var _tapOverlay = document.getElementById('tap-overlay');
@@ -2440,10 +2579,14 @@
   // <!-- DEVMODE:END -->
 
   // ── Tab/window close: notify Companion ───────────────────────────────────
-  // pagehide is the most reliable close signal on mobile (fires on iOS Safari
-  // when the tab is swiped away; beforeunload often doesn't). Presence leave
-  // is the server-side fallback and handles ungraceful kills.
-  window.addEventListener('pagehide', function () {
+  // pagehide fires reliably on iOS Safari (tab swipe-away, navigation).
+  // visibilitychange→hidden fires on Android Chrome when a tab is closed, but
+  // also fires on app-switch and screen-off — send bye only after a short delay
+  // and cancel if the page becomes visible again (app-switch / screen-back-on).
+  // Untracking presence on visibilitychange is always safe: Supabase re-tracks
+  // when the phone re-subscribes, and it avoids presence leaks on Android kills.
+  var _byeDelayId = null;
+  function _sendByeAndUntrack() {
     dbg('pagehide: sending bye', 'warn');
     if (broadcastChannel) {
       try {
@@ -2452,6 +2595,32 @@
           payload: { type: 'bye' },
         });
       } catch (_) {}
+      try { broadcastChannel.untrack(); } catch (_) {}
+    }
+  }
+  window.addEventListener('pagehide', function () {
+    if (_byeDelayId !== null) { clearTimeout(_byeDelayId); _byeDelayId = null; }
+    _sendByeAndUntrack();
+  }, { capture: true });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') {
+      // Untrack immediately (cheap, self-corrects on re-visible).
+      if (broadcastChannel) { try { broadcastChannel.untrack(); } catch (_) {} }
+      // Delay the bye broadcast — if the page comes back visible within 3s
+      // (app-switch, screen-on) we cancel it to avoid a false disconnect.
+      if (_byeDelayId !== null) clearTimeout(_byeDelayId);
+      _byeDelayId = setTimeout(function () {
+        _byeDelayId = null;
+        if (document.visibilityState === 'hidden') {
+          if (broadcastChannel) {
+            try { broadcastChannel.send({ type: 'broadcast', event: 'bye', payload: { type: 'bye' } }); } catch (_) {}
+          }
+        }
+      }, 3000);
+    } else {
+      // Page became visible again — cancel pending bye and re-track presence.
+      if (_byeDelayId !== null) { clearTimeout(_byeDelayId); _byeDelayId = null; }
+      if (broadcastChannel) { try { broadcastChannel.track({ user: 'phone' }); } catch (_) {} }
     }
   }, { capture: true });
 
