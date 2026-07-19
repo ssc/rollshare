@@ -704,9 +704,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = 'dev-20260718-2303';
-  var GIT_COMMIT     = '0c0eca4';
-  var BUILD_TIME     = '2026-07-18T23:03:19Z';
+  var APP_VERSION    = 'dev-20260718-2322';
+  var GIT_COMMIT     = 'a0aefc4';
+  var BUILD_TIME     = '2026-07-18T23:22:25Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1449,7 +1449,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260718-2303', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260718-2322', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
@@ -2294,10 +2294,10 @@
   // Stamp version into status bar and show git hash badge in debug mode
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== 'dev-20260718-2303') {
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260718-2322') {
       v.textContent = 'v' + APP_VERSION;
     }
-    if (debugMode && GIT_COMMIT && GIT_COMMIT !== '0c0eca4') {
+    if (debugMode && GIT_COMMIT && GIT_COMMIT !== 'a0aefc4') {
       // Primary mode: badge next to h1 title
       var _badge = document.getElementById('ver-badge');
       if (_badge) { _badge.textContent = GIT_COMMIT; _badge.style.display = 'inline'; }
