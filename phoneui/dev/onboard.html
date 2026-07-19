@@ -471,10 +471,12 @@
                         // Cloud path — redirect to phoneui-cloud.html on GitHub Pages.
                         var _sid = parts[1] || '';
                         var _dev3 = parts[2] === '1';
+                        var _dbg3 = parts[3] === '1';
                         if (_sid) {
                             var _dest = './phoneui-cloud.html'
                                         + '?s=' + encodeURIComponent(_sid)
-                                        + (_dev3 ? '&dev=1' : '');
+                                        + (_dev3 ? '&dev=1' : '')
+                                        + (_dbg3 ? '&debug=1' : '');
                             window.location.replace(_dest);
                         } else {
                             schemaError = true;

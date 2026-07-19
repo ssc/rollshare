@@ -629,7 +629,7 @@
   var MOTION_NOISE_EMA_ALPHA      = 0.02;
   var JUST_SETTLED_DELAY_FRAMES   = 5;  // ~0.42s at 12fps; was 7 (too cautious), was 4 (too fast)
   var GRAB_SPIKE_WINDOW           = 20;
-  var GRAB_THRESHOLD              = 5.0;
+  var GRAB_THRESHOLD              = 3.5;  // was 5.0; lowered to catch gentler rolls (min noise floor is ~3.0)
 
   // ── Transport mode ────────────────────────────────────────────────────────
   // true  → embed PNG as base64 directly in the Broadcast payload (no Storage).
@@ -704,9 +704,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = 'dev-20260718-2137';
+  var APP_VERSION    = 'dev-20260718-2300';
   var GIT_COMMIT     = '0c0eca4';
-  var BUILD_TIME     = '2026-07-18T21:37:35Z';
+  var BUILD_TIME     = '2026-07-18T23:00:39Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1449,7 +1449,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260718-2137', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260718-2300', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
@@ -2294,7 +2294,7 @@
   // Stamp version into status bar and show git hash badge in debug mode
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== 'dev-20260718-2137') {
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260718-2300') {
       v.textContent = 'v' + APP_VERSION;
     }
     if (debugMode && GIT_COMMIT && GIT_COMMIT !== '0c0eca4') {
