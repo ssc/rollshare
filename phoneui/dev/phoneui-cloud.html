@@ -704,9 +704,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = 'dev-20260718-2351';
+  var APP_VERSION    = 'dev-20260719-0029';
   var GIT_COMMIT     = 'a0aefc4';
-  var BUILD_TIME     = '2026-07-18T23:51:12Z';
+  var BUILD_TIME     = '2026-07-19T00:29:06Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1340,6 +1340,7 @@
           .channel('cloud:' + activeRendezvousKey)
           .on('presence', { event: 'leave' }, function (payload) {
             if (isShim) return; // relay doesn't support presence; ignore
+            dbg('presence leave raw: ' + JSON.stringify((payload && payload.leftPresences) ? payload.leftPresences.map(function(p){return p.user;}) : payload), 'warn');
             var left = (payload && payload.leftPresences) || [];
             var companionLeft = left.some(function (p) { return p.user === 'companion'; });
             if (companionLeft) {
@@ -1348,17 +1349,10 @@
             }
           })
           .on('presence', { event: 'sync' }, function () {
-            // Fired when the Supabase WS reconnects and presence state is synced.
-            // If companion is already present at sync time, 'join' will NOT fire for
-            // them (only for newly-seen members).  Catch this case explicitly so the
-            // zombie overlay is dismissed even when the phone's WS reconnected after
-            // Companion was already online.
-            // NOTE: do NOT guard on zombie-overlay presence here.  The common failure
-            // mode is: phone WS silently drops (Android background throttling) → 
-            // Companion restarts → phone WS reconnects → sync fires → companion IS
-            // present → but no zombie was ever shown.  We must re-send hello regardless.
             try {
               var _ps = broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+              var _keys = Object.values(_ps).map(function(pp) { return Array.isArray(pp) ? pp.map(function(p){return p.user;}) : pp; });
+              dbg('presence sync: state=' + JSON.stringify(_keys));
               var _companionPresent = Object.values(_ps).some(function(pp) {
                 return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
               });
@@ -1449,7 +1443,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260718-2351', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260719-0029', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
@@ -2294,7 +2288,7 @@
   // Stamp version into status bar and show git hash badge in debug mode
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== 'dev-20260718-2351') {
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260719-0029') {
       v.textContent = 'v' + APP_VERSION;
     }
     if (debugMode && GIT_COMMIT && GIT_COMMIT !== 'a0aefc4') {
