@@ -463,7 +463,7 @@
 <div id="cam-content">
 <header>
   <div class="header-title-row">
-    <img src="../assets/rollshare_logo.png" alt="RollShare" />
+    <img src="../../assets/rollshare_logo.png" alt="RollShare" />
     <h1>RollShare <span id="ver-badge"></span></h1>
     <div id="friend-mode-sub">friend mode <span id="ver-badge-friend"></span></div>
   </div>
@@ -473,7 +473,7 @@
 <!-- Info overlay -->
 <div id="info-overlay" role="dialog" aria-modal="true" aria-label="Setup info">
   <div id="info-dialog">
-    <img src="../assets/paper_tray_00.jpg" alt="Phone resting face-down on a soda can over a paper dice tray" />
+    <img src="../../assets/paper_tray_00.jpg" alt="Phone resting face-down on a soda can over a paper dice tray" />
     <div id="info-dialog-body">
       <p>Rest your phone <strong>face-down</strong> on a prop (a soda can works great) so the camera looks straight down at your dice tray.</p>
       <div id="info-dialog-footer">
@@ -704,9 +704,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = 'dev-20260719-1733';
+  var APP_VERSION    = 'dev-20260719-1736';
   var GIT_COMMIT     = '06c2bff';
-  var BUILD_TIME     = '2026-07-19T17:33:04Z';
+  var BUILD_TIME     = '2026-07-19T17:36:53Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -899,7 +899,7 @@
         ctx.font = '13px monospace';
         ctx.fillText('Empty tray (shim)', 8, 120);
       };
-      _bgImg.src = '../assets/paper_tray_00.jpg';
+      _bgImg.src = '../../assets/paper_tray_00.jpg';
     })();
     var _fakeGetUserMedia = function() {
       var stream = _fakeCanvas.captureStream ? _fakeCanvas.captureStream(10) : new MediaStream();
@@ -1466,7 +1466,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260719-1733', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260719-1736', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
@@ -2311,7 +2311,7 @@
   // Stamp version into status bar and show git hash badge in debug mode
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== 'dev-20260719-1733') {
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260719-1736') {
       v.textContent = 'v' + APP_VERSION;
     }
     if (debugMode && GIT_COMMIT && GIT_COMMIT !== '06c2bff') {
