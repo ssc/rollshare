@@ -704,9 +704,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = 'dev-20260719-1956';
-  var GIT_COMMIT     = '1358501';
-  var BUILD_TIME     = '2026-07-19T19:56:56Z';
+  var APP_VERSION    = 'dev-20260720-1429';
+  var GIT_COMMIT     = 'e5e2abc';
+  var BUILD_TIME     = '2026-07-20T14:29:32Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -1069,6 +1069,20 @@
       }
     }
     return base;
+  }
+
+  // Re-send hello on key lifecycle edges (for example: camera start) to
+  // avoid startup races where Companion missed the initial hello.
+  function _sendHello(reason) {
+    if (!broadcastChannel) return;
+    var payload = _helloPayload();
+    if (reason) payload.reason = reason;
+    broadcastChannel.send({
+      type: 'broadcast',
+      event: _helloEventName(),
+      payload: payload,
+    }).catch(function () {});
+    dbg('hello tx event=' + _helloEventName() + (reason ? ' reason=' + reason : ''));
   }
 
   function _switchToFriendPrivateChannel(friendKey, friendName) {
@@ -1466,7 +1480,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260719-1956', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260720-1429', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
@@ -2293,6 +2307,7 @@
     setStatus('\uD83D\uDC41', 'Watching for motion\u2026', 'Point camera at the dice tray');
     frameTimerId = setInterval(processFrame, Math.round(1000 / 12));
     _sendFrameOnStart = true;  // request one display-only frame on the next tick
+    _sendHello('camera_started');
     // Show calibration banner for friend sessions (after camera starts so layout is stable)
     if (isFriendMode || _isFriendReconnect) _updateCalibBanner();
 
@@ -2311,10 +2326,10 @@
   // Stamp version into status bar and show git hash badge in debug mode
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== 'dev-20260719-1956') {
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260720-1429') {
       v.textContent = 'v' + APP_VERSION;
     }
-    if (debugMode && GIT_COMMIT && GIT_COMMIT !== '1358501') {
+    if (debugMode && GIT_COMMIT && GIT_COMMIT !== 'e5e2abc') {
       // Primary mode: badge next to h1 title
       var _badge = document.getElementById('ver-badge');
       if (_badge) { _badge.textContent = GIT_COMMIT; _badge.style.display = 'inline'; }
