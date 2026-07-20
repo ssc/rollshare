@@ -467,7 +467,7 @@
     <h1>RollShare <span id="ver-badge"></span></h1>
     <div id="friend-mode-sub">friend mode <span id="ver-badge-friend"></span></div>
   </div>
-  <p>Point phone down at the dice tray — <button id="info-btn" title="How to set up" aria-label="Setup info">how to set up?</button></p>
+  <p>Point phone down at the dice tray — <span id="battery-display" style="display:none;font-size:0.8em;color:#86efac;margin-right:0.35rem;"></span><button id="info-btn" title="How to set up" aria-label="Setup info">how to set up?</button></p>
 </header>
 
 <!-- Info overlay -->
@@ -704,9 +704,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = 'dev-20260719-1723';
+  var APP_VERSION    = 'dev-20260719-1733';
   var GIT_COMMIT     = '06c2bff';
-  var BUILD_TIME     = '2026-07-19T17:23:41Z';
+  var BUILD_TIME     = '2026-07-19T17:33:04Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -967,10 +967,23 @@
 
   // Battery level (0.0–1.0) from Battery Status API; null if unavailable (e.g. iOS Safari).
   var _batteryLevel = null;
+  function _updateBatteryDisplay(level) {
+    var el = document.getElementById('battery-display');
+    if (!el) return;
+    if (level === null || level === undefined) { el.style.display = 'none'; return; }
+    var pct = Math.round(level * 100);
+    el.textContent = 'Battery: ' + pct + '%';
+    el.style.color = level < 0.25 ? '#f87171' : '#86efac';
+    el.style.display = '';
+  }
   if (navigator.getBattery) {
     navigator.getBattery().then(function(bat) {
       _batteryLevel = bat.level;
-      bat.addEventListener('levelchange', function() { _batteryLevel = bat.level; });
+      _updateBatteryDisplay(_batteryLevel);
+      bat.addEventListener('levelchange', function() {
+        _batteryLevel = bat.level;
+        _updateBatteryDisplay(_batteryLevel);
+      });
     }).catch(function() {});
   }
 
@@ -1453,7 +1466,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260719-1723', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260719-1733', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
@@ -2298,7 +2311,7 @@
   // Stamp version into status bar and show git hash badge in debug mode
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== 'dev-20260719-1723') {
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260719-1733') {
       v.textContent = 'v' + APP_VERSION;
     }
     if (debugMode && GIT_COMMIT && GIT_COMMIT !== '06c2bff') {
