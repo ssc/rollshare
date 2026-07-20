@@ -629,7 +629,7 @@
   var MOTION_NOISE_EMA_ALPHA      = 0.02;
   var JUST_SETTLED_DELAY_FRAMES   = 5;  // ~0.42s at 12fps; was 7 (too cautious), was 4 (too fast)
   var GRAB_SPIKE_WINDOW           = 20;
-  var GRAB_THRESHOLD              = 3.2;  // was 5.0; lowered to catch gentler rolls (min noise floor is ~3.0)
+  var GRAB_THRESHOLD              = 3.0;  // was 3.2; lowered to match diff threshold min noise floor
 
   // ── Transport mode ────────────────────────────────────────────────────────
   // true  → embed PNG as base64 directly in the Broadcast payload (no Storage).
@@ -704,9 +704,9 @@
   MotionDetector.prototype.reset = function () { this.prevGray = null; };
 
   // ── Globals ───────────────────────────────────────────────────────────────
-  var APP_VERSION    = 'dev-20260719-0102';
-  var GIT_COMMIT     = 'a0aefc4';
-  var BUILD_TIME     = '2026-07-19T01:02:53Z';
+  var APP_VERSION    = 'dev-20260719-1723';
+  var GIT_COMMIT     = '06c2bff';
+  var BUILD_TIME     = '2026-07-19T17:23:41Z';
   function _collectUrlParams() {
     var merged = new URLSearchParams(window.location.search || '');
     var hash = window.location.hash || '';
@@ -965,6 +965,15 @@
   var sfCanvas        = null;
   var capCanvas       = null;
 
+  // Battery level (0.0–1.0) from Battery Status API; null if unavailable (e.g. iOS Safari).
+  var _batteryLevel = null;
+  if (navigator.getBattery) {
+    navigator.getBattery().then(function(bat) {
+      _batteryLevel = bat.level;
+      bat.addEventListener('levelchange', function() { _batteryLevel = bat.level; });
+    }).catch(function() {});
+  }
+
   // Friend session colour — loaded from localStorage, sent in hello payload.
   var friendPipColor = 'blue';
 
@@ -1032,6 +1041,7 @@
       dpr: window.devicePixelRatio || 1,
       tz: (Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '') || '',
       ts: Date.now(),
+      battery_level: _batteryLevel,
     };
     if (isFriendMode && !friendAssigned) {
       base.type = 'friend_hello';
@@ -1443,7 +1453,7 @@
             // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
             var bcast = (payload && payload.payload) || payload || {};
             var theirVer = (bcast.app_version || '').replace(/^v/, '');
-            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260719-0102', '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('dev-20260719-1723', '');
             dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
             // Cancel the broker-fallback timer: Companion is present.
             if (window._brokerFallbackId != null) {
@@ -1887,7 +1897,7 @@
     if (r.inMotion) {
       lastMotionFrame = frameSeq; settleFired = false;
       motionDot.classList.add('active');
-      setStatus('🎲', 'Roll detected…', 'Keep rolling!');
+      setStatus('🎲', 'Movement detected…', 'Keep rolling!');
       // Send a display-only preview frame on the first above-threshold motion frame
       // of each throw — pure eye candy, Python will not run analysis on it.
       if (!_grabPreviewSent && r.diff_mean > GRAB_THRESHOLD && !uploading) {
@@ -2057,7 +2067,7 @@
       broadcastChannel.send({
         type: 'broadcast',
         event: 'frame',
-        payload: { type: 'frame', image_b64: b64, display_only: true, frame_seq: seq },
+        payload: { type: 'frame', image_b64: b64, display_only: true, frame_seq: seq, battery_level: _batteryLevel },
       });
       dbg('display-only preview sent seq=' + seq);
     } catch (e) {
@@ -2109,7 +2119,7 @@
           reader.readAsDataURL(blob);
         });
         uploadBar.style.width = '70%';
-        var _inlinePayload = { type: 'frame', image_b64: b64, peak_before_settle: peakBeforeSettle, frame_seq: seq };
+        var _inlinePayload = { type: 'frame', image_b64: b64, peak_before_settle: peakBeforeSettle, frame_seq: seq, battery_level: _batteryLevel };
         var bcResult = await broadcastChannel.send({
           type: 'broadcast',
           event: 'frame',
@@ -2145,7 +2155,7 @@
         }
         dbg('upload ok, sending broadcast frame event');
         uploadBar.style.width = '80%';
-        var _storagePayload = { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq };
+        var _storagePayload = { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq, battery_level: _batteryLevel };
         var bcResult2 = await broadcastChannel.send({
           type: 'broadcast',
           event: 'frame',
@@ -2288,10 +2298,10 @@
   // Stamp version into status bar and show git hash badge in debug mode
   (function() {
     var v = document.getElementById('status-version');
-    if (v && APP_VERSION && APP_VERSION !== 'dev-20260719-0102') {
+    if (v && APP_VERSION && APP_VERSION !== 'dev-20260719-1723') {
       v.textContent = 'v' + APP_VERSION;
     }
-    if (debugMode && GIT_COMMIT && GIT_COMMIT !== 'a0aefc4') {
+    if (debugMode && GIT_COMMIT && GIT_COMMIT !== '06c2bff') {
       // Primary mode: badge next to h1 title
       var _badge = document.getElementById('ver-badge');
       if (_badge) { _badge.textContent = GIT_COMMIT; _badge.style.display = 'inline'; }
