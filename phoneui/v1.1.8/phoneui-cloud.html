@@ -1,0 +1,2506 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>RollShare — PhoneUI Camera</title>
+  <script>
+    (function() {
+      var _p = new URLSearchParams(window.location.search);
+      if (_p.get('dev') === '1') window._rollshare_dev = true;
+      // ?shim=1 — load local broadcast relay shim instead of real Supabase CDN.
+      // The shim must be fetched synchronously (document.write) so it installs
+      // window.supabase before the CDN <script> tag below is evaluated.
+      if (_p.get('shim') === '1') {
+        var _relayParam = _p.get('relay') || '';
+        // relay= can be a full ws:// URL or an https:// base.
+        if (_relayParam.match(/^wss?:\/\//)) {
+          window.ROLLSHARE_RELAY_URL = _relayParam.replace(/\/?$/, '') + '/devmode/broadcast-relay';
+        } else {
+          var _relayBase = _relayParam || 'https://localhost:9090';
+          window.ROLLSHARE_RELAY_URL = _relayBase.replace(/^https/, 'wss').replace(/^http(?!s)/, 'ws') + '/devmode/broadcast-relay';
+        }
+        // Load shim from same-origin http:// to avoid self-signed cert rejection.
+        // serve-phoneui.ps1 caches it at phoneui/broadcast-relay-shim.js on startup.
+        document.write('<script src="broadcast-relay-shim.js"><\/script>');
+      }
+    })();
+    if (!window._rollshare_dev) {
+      !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+" (stub)"},o="init bs ws ge fs capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+      posthog.init('phc_znGJ5C6tARtEWQkCkyRJmWsEna3iq7ds4FquU93F6fAE', {
+        api_host: 'https://us.i.posthog.com',
+        autocapture: false, capture_pageview: false, capture_pageleave: false,
+        disable_session_recording: true, persistence: 'memory',
+      });
+      posthog.register({ surface: 'app', subsurface: 'phoneui-cloud' });
+    }
+  </script>
+  <script>
+    // Only load the real Supabase CDN when NOT in shim mode.
+    // In shim mode, broadcast-relay-shim.js (loaded above) already installed
+    // window.supabase and the CDN would overwrite it.
+    if (new URLSearchParams(location.search).get('shim') !== '1') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"><\/script>');
+    }
+  </script>
+  <!-- Canvas stream generators shared with phoneui-direct (loaded via @@shared-js there). -->
+  <script src="rs-phoneui-shared.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Segoe UI, system-ui, sans-serif;
+      background: #0a0a1a;
+      color: #e8e8e8;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.85rem;
+      padding-bottom: calc(0.85rem + var(--devpanel-h, 0px));
+      overflow: hidden;
+    }
+    header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.5rem; text-align: center; }
+    header .header-title-row { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    header .header-title-row img { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; }
+    header h1 { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin: 0; }
+    header p  { color: #777; font-size: 1.0rem; margin-top: 0.25rem; }
+
+    #friend-mode-sub {
+      display: none;
+      align-self: center;
+      padding: 0.18rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid #365f49;
+      background: #14261d;
+      color: #9be6b6;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+    #ver-badge { display: none; font-family: monospace; font-size: 0.62rem; color: #86efac; opacity: 0.75; vertical-align: middle; font-weight: 400; }
+
+    #error-banner {
+      display: none;
+      background: #3a0a0a; border: 1px solid #c0392b; border-radius: 10px;
+      padding: 0.85rem 1rem; margin-bottom: 0.75rem;
+      color: #f5b7b1; font-size: 0.86rem; line-height: 1.5;
+      width: 100%; max-width: 460px;
+    }
+    #error-banner strong { color: #f1948a; display: block; margin-bottom: 0.2rem; }
+
+    /* ── Camera preview ── */
+    #preview-wrap {
+      width: 100%; max-width: 460px;
+      position: relative;
+      border-radius: 12px 12px 0 0; overflow: hidden;
+      background: #111;
+      aspect-ratio: 4/3;
+      margin: 0 auto 0;
+    }
+    #cam-video {
+      width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; display: block;
+    }
+    /* In inverted (face-down) mode the body is rotated by --page-invert-angle;
+       counter-rotate the video so the preview appears right-side up to the viewer. */
+    body.page-inverted #cam-video {
+      transform: rotate(var(--page-invert-angle, 180deg));
+    }
+
+    #preview-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(10,10,26,0.85);
+      font-size: 0.88rem; color: #888; gap: 0.45rem;
+    }
+    #preview-overlay.hidden { display: none; }
+    #preview-overlay .pi { font-size: 2rem; }
+
+    /* motion indicator dot — top-right corner of preview */
+    #motion-dot {
+      position: absolute; top: 8px; right: 8px;
+      width: 11px; height: 11px; border-radius: 50%;
+      background: #333;
+      transition: background 0.08s;
+    }
+    #motion-dot.active { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+
+    /* ── Status bar ── */
+    #status-bar {
+      width: 100%; max-width: 460px;
+      background: #111c17; border: 1px solid #1f3d2d; border-radius: 0 0 10px 10px;
+      padding: 0.3rem 0.75rem;
+      display: flex; align-items: center; gap: 0.4rem;
+      margin: 0 auto 8px;
+    }
+    #status-icon { font-size: 0.85rem; flex-shrink: 0; }
+    #status-text { font-size: 0.72rem; font-weight: 600; color: #86efac; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #status-sub  { display: none; }
+    #status-version { font-family: monospace; font-size: 0.6rem; color: #2a5a3a; margin-left: auto; flex-shrink: 0; }
+    /* tap-to-start overlay — shown on iOS when autostart needs a real gesture */
+    #tap-overlay {
+      display: none; position: fixed; inset: 0; z-index: 19999;
+      background: rgba(5,10,8,0.88);
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 1rem; cursor: pointer;
+    }
+    #tap-overlay.show { display: flex; }
+    #tap-overlay .tap-icon { font-size: 3rem; }
+    #tap-overlay .tap-msg  { font-size: 1.2rem; font-weight: 700; color: #86efac; }
+    #tap-overlay .tap-sub  { font-size: 0.85rem; color: #4a8a60; }
+
+    /* ── Controls ── */
+    #controls { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 0.45rem; }
+    #action-row-wrap { width: 100%; max-width: 460px; }
+
+    #friend-name-row {
+      display: none;
+      width: 100%; max-width: 460px;
+      margin: 0.65rem auto 0.1rem;
+      padding-top: 10px;
+    }
+    #friend-name-label-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+    #friend-name-label {
+      font-size: 0.72rem;
+      color: #8ab29a;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #friend-name-input {
+      flex: 0 0 50%;
+      min-width: 0;
+      background: #0f1a14;
+      border: 1px solid #2a5038;
+      border-radius: 8px;
+      color: #d7f3e3;
+      font-size: 0.86rem;
+      padding: 0.45rem 0.55rem;
+      outline: none;
+    }
+    #friend-name-input:focus {
+      border-color: #3e7a58;
+      box-shadow: 0 0 0 2px #1b3f2d;
+    }
+
+    #friend-color-label {
+      font-size: 0.72rem;
+      color: #8ab29a;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #friend-color-row-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+    }
+    .friend-color-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .friend-swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid #2a5038;
+      cursor: pointer;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .friend-swatch:hover { border-color: #4a9a6a; }
+    .friend-swatch.is-selected {
+      border-color: #86efac;
+      box-shadow: 0 0 0 1px #86efac inset;
+    }
+    .friend-swatch-blue   { background: #2f6fbe; }
+    .friend-swatch-green  { background: #2f8f3a; }
+    .friend-swatch-red    { background: #c0392b; }
+    .friend-swatch-black  { background: #17171d; }
+    .friend-swatch-yellow { background: #d7b93d; }
+
+    /* camera selector — native select overlaid on a styled div */
+    #camera-select-row { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
+    #camera-select-label { font-size: 0.72rem; color: #8ab29a; white-space: nowrap; flex-shrink: 0; }
+    #camera-select-wrap { position: relative; flex: 1; min-width: 0; }
+    #camera-select-face {
+      width: 100%; padding: 0.55rem 2rem 0.55rem 0.7rem;
+      background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
+      color: #ccc; font-size: 0.84rem; text-align: left; user-select: none;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    #camera-select-face::after {
+      content: "▾";
+      position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%);
+      color: #555; pointer-events: none;
+    }
+    #cameraSelect { display: none; }
+    #cam-picker-panel {
+      display: none; flex-direction: column;
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 200;
+      background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
+      overflow: hidden;
+    }
+    #cam-picker-panel.open { display: flex; }
+    .cam-picker-option {
+      width: 100%; padding: 0.6rem 0.7rem; text-align: left;
+      background: none; border: none; border-bottom: 1px solid #2e2e50;
+      color: #ccc; font-size: 0.84rem; cursor: pointer; font-family: inherit;
+    }
+    .cam-picker-option:last-child { border-bottom: none; }
+    .cam-picker-option.selected { color: #86efac; background: #0d1a12; }
+    .cam-picker-option:hover { background: #22224e; }
+
+    /* torch + start row */
+    #action-row { display: flex; gap: 0.45rem; }
+    #torch-btn {
+      flex-shrink: 0;
+      padding: 0.6rem 0.85rem;
+      background: #1a1a2e; border: 1px solid #2e2e50; border-radius: 8px;
+      color: #ccc; font-size: 0.84rem; cursor: pointer;
+      display: none; /* shown after camera opens if torch capable */
+    }
+    #torch-btn.on { background: #292910; border-color: #6a6a10; color: #facc15; }
+    #torch-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* no-torch warning banner */
+    #no-torch-banner {
+      background: #1f1000; border: 1px solid #92400e; border-radius: 8px;
+      padding: 0.48rem 0.7rem;
+      display: flex; align-items: center; gap: 0.55rem;
+      font-size: 0.81rem; color: #fcd34d; line-height: 1.4;
+    }
+    #no-torch-banner span { flex: 1; }
+    #no-torch-switch-btn {
+      flex-shrink: 0; padding: 0.3rem 0.65rem;
+      background: #78350f; border: 1px solid #92400e; border-radius: 6px;
+      color: #fcd34d; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      white-space: nowrap;
+    }
+    #no-torch-switch-btn:hover { background: #92400e; }
+
+    #start-btn {
+      flex: 1; padding: 0.62rem 1rem;
+      background: #16a34a; color: #f0faf4;
+      font-size: 0.94rem; font-weight: 700;
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: background 0.12s;
+    }
+    #start-btn:hover { background: #15803d; }
+    #start-btn:active { background: #14532d; }
+    #start-btn:disabled { background: #1a3020; color: #3a6040; cursor: default; }
+    /* compact status bar pinned to the bottom of the screen */
+
+    /* upload progress */
+    #upload-bar-wrap {
+      display: none; margin-top: 0.45rem;
+      width: 100%; max-width: 460px;
+      height: 3px; background: #1a2a1a; border-radius: 2px; overflow: hidden;
+    }
+    #upload-bar { height: 100%; width: 0%; background: #16a34a; border-radius: 2px; transition: width 0.2s; }
+
+    /* ── Friend calibration banner (shown only once calibrated) ── */
+    #calib-banner {
+      width: 100%; max-width: 460px;
+      margin: 6px auto 0;
+      padding: 0.38rem 0.75rem;
+      background: #0f1f1a; border: 1px solid #1a4a2a; border-radius: 8px;
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.78rem; color: #4a9a6a; line-height: 1.4;
+    }
+    #calib-banner-text { flex: 1; }
+    #calib-reset-btn {
+      flex-shrink: 0; padding: 0.18rem 0.45rem;
+      background: transparent; border: 1px solid #2a5038; border-radius: 5px;
+      color: #4a8a60; font-size: 0.7rem; cursor: pointer; font-family: inherit;
+    }
+    #calib-reset-btn:hover { border-color: #3e7a58; color: #86efac; }
+
+    footer { margin-top: auto; padding-top: 0.85rem; font-size: 0.68rem; color: #2a2a3a; text-align: center; }
+
+    /* debug log panel — lives inside #devmode-panel */
+    #dbg-panel {
+      display: none;
+      border-top: 1px solid #1a3020; padding: 0.4rem 0; box-sizing: border-box;
+      max-height: 130px; overflow-y: auto; font-family: monospace; font-size: 0.68rem; color: #4ade80;
+    }
+    #dbg-panel.visible { display: block; }
+    .dbg-err { color: #f87171; }
+    .dbg-warn { color: #fbbf24; }
+
+    /* motion diff graph — lives inside #devmode-panel */
+    #motion-graph-wrap {
+      display: none;
+      border-top: 1px solid #1a3020; padding: 0.35rem 0 0.4rem;
+    }
+    #motion-graph-wrap.visible { display: block; }
+    #motion-graph-label {
+      font-family: monospace; font-size: 0.65rem; color: #4ade80;
+      margin-bottom: 0.2rem; display: flex; justify-content: space-between;
+    }
+    #motion-graph { display: block; width: 100%; height: 72px; }
+
+    /* canvas preview panel — lives inside #devmode-panel */
+    #canvas-preview-wrap {
+      display: none;
+      border-top: 1px solid #1a3020; padding: 0.35rem 0 0.4rem;
+    }
+    #canvas-preview-wrap.visible { display: block; }
+    #canvas-preview-label {
+      font-family: monospace; font-size: 0.65rem; color: #4ade80;
+      margin-bottom: 0.3rem;
+    }
+    #canvas-preview-row {
+      display: flex; gap: 0.5rem; align-items: flex-start;
+    }
+    .cpv-block { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; }
+    .cpv-block span { font-family: monospace; font-size: 0.6rem; color: #4a8a60; }
+    .cpv-block canvas { display: block; width: 100%; height: auto; border: 1px solid #1a3020; border-radius: 3px; image-rendering: pixelated; }
+
+    #page-rotate-wrapper {
+      max-width: 480px; width: 100%; padding: 0 1rem;
+      display: flex; flex-direction: column;
+    }
+    #cam-content {
+      display: flex; flex-direction: column;
+      align-items: stretch; width: 100%;
+    }
+    #bottom-tray { position: fixed; bottom: 0; left: 0; right: 0; z-index: 500; display: flex; justify-content: space-between; align-items: center; padding: 10px 1rem; pointer-events: none; }
+    #bottom-tray > * { pointer-events: auto; }
+    /* In inverted mode the body transform flips the coordinate system, so
+       bottom:0 ends up at the physical top (= user's visual bottom). Switch to
+       top:0 (= physical bottom = user's visual top) and counter-rotate the tray
+       so buttons appear right-side up to the inverted viewer. */
+    body.page-inverted #bottom-tray { bottom: auto; top: 0; transform: rotate(var(--page-invert-angle, 180deg)); transform-origin: center center; }
+    #rotate-toggle-btn { height: 2.6rem; border-radius: 1.3rem; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0 0.85rem; gap: 0.35rem; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    #rotate-toggle-btn .btn-icon { font-size: 1.4rem; }
+    #rotate-toggle-btn .btn-label { font-size: 0.72rem; white-space: nowrap; display: inline-block; transition: transform 0.2s; }
+    body.page-inverted #rotate-toggle-btn .btn-label { transform: rotate(180deg); }
+    /* devmode floating button — right side of bottom tray, matches Flip Screen pill style */
+    #devmode-toggle-btn { height: 2.6rem; border-radius: 1.3rem; border: 1px solid #555; background: rgba(30,30,60,0.85); color: #ccc; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0 0.85rem; gap: 0.35rem; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.5); font-size: inherit; }
+    #devmode-toggle-btn .btn-icon { font-size: 1.4rem; }
+    #devmode-toggle-btn .btn-label { font-size: 0.72rem; white-space: nowrap; }
+    /* devmode overlay panel */
+    #devmode-panel {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 10000;
+      background: rgba(10,8,4,0.97); border-top: 1px solid #f97316;
+      padding: 12px; overflow-y: auto; max-height: 65vh;
+      flex-direction: column; gap: 8px;
+      font-family: monospace; box-shadow: 0 -4px 24px rgba(0,0,0,0.7);
+    }
+    #devmode-panel.open { display: flex; }
+
+    /* ── Info overlay ── */
+    #info-btn {
+      display: inline;
+      background: none; border: none; padding: 0;
+      color: #60a5fa; font-size: 0.82rem;
+      text-decoration: underline; text-underline-offset: 2px;
+      cursor: pointer; font-family: inherit;
+    }
+    #info-btn:hover { color: #93c5fd; }
+    #info-overlay {
+      display: none; position: fixed; inset: 0; z-index: 20000;
+      background: rgba(0,0,0,0.82);
+      align-items: center; justify-content: center; padding: 1.2rem;
+    }
+    #info-overlay.open { display: flex; }
+    #info-dialog {
+      background: #0d1a12; border: 1px solid #2a4a35; border-radius: 14px;
+      max-width: 340px; width: 100%; overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    }
+    #info-dialog img {
+      width: 100%; display: block;
+      max-height: 50vh; object-fit: cover; object-position: center 30%;
+    }
+    #info-dialog-body {
+      padding: 0.85rem 1rem 1rem;
+      display: flex; flex-direction: column; gap: 0.55rem;
+    }
+    #info-dialog-body p {
+      font-size: 0.82rem; color: #a0c8b0; line-height: 1.45; margin: 0;
+    }
+    #info-dialog-footer {
+      display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+    }
+    #info-dialog-footer a {
+      font-size: 0.78rem; color: #4ade80; text-decoration: underline;
+    }
+    #info-dismiss-btn {
+      padding: 0.38rem 0.85rem;
+      background: #1a3020; border: 1px solid #2a5030; border-radius: 6px;
+      color: #86efac; font-size: 0.78rem; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<script>
+  // Apply rotation to <body> so Chrome Android hit-testing follows the transform.
+  // Rotating a child wrapper div breaks touch event coordinates on Android Chrome.
+  (function () {
+    var savedAngle = localStorage.getItem('rs_invert_angle');
+    // backward-compat: old key 'rs_page_rotated'
+    if (!savedAngle && localStorage.getItem('rs_page_rotated') === '1') savedAngle = '180';
+    if (savedAngle) {
+      var angle = parseInt(savedAngle, 10);
+      document.body.style.transform = 'rotate(' + angle + 'deg)';
+      document.body.style.transformOrigin = 'center center';
+      document.body.classList.add('page-inverted');
+      document.body.style.setProperty('--page-invert-angle', angle + 'deg');
+    }
+  })();
+</script>
+<div id="page-rotate-wrapper">
+
+<div id="cam-content">
+<header>
+  <div class="header-title-row">
+    <img src="../../assets/rollshare_logo.png" alt="RollShare" />
+    <h1>RollShare <span id="ver-badge"></span></h1>
+    <div id="friend-mode-sub">friend mode <span id="ver-badge-friend"></span></div>
+  </div>
+  <p>Point phone down at the dice tray — <span id="battery-display" style="display:none;font-size:0.8em;color:#86efac;margin-right:0.35rem;"></span><button id="info-btn" title="How to set up" aria-label="Setup info">how to set up?</button></p>
+</header>
+
+<!-- Info overlay -->
+<div id="info-overlay" role="dialog" aria-modal="true" aria-label="Setup info">
+  <div id="info-dialog">
+    <img src="../../assets/paper_tray_00.jpg" alt="Phone resting face-down on a soda can over a paper dice tray" />
+    <div id="info-dialog-body">
+      <p>Rest your phone <strong>face-down</strong> on a prop (a soda can works great) so the camera looks straight down at your dice tray.</p>
+      <div id="info-dialog-footer">
+        <a href="https://ssc.github.io/rollshare/get-started.html" target="_blank" rel="noopener">More info ↗</a>
+        <button id="info-dismiss-btn">Got it</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="error-banner" role="alert">
+  <strong id="error-title">Something went wrong</strong>
+  <span id="error-msg">Check that the QR code is valid and the Companion App is running.</span>
+</div>
+
+<!-- Camera preview -->
+<div id="preview-wrap">
+  <video id="cam-video" autoplay playsinline muted></video>
+  <div id="preview-overlay">
+    <span class="pi">📷</span>
+    <span>Opening camera…</span>
+  </div>
+  <div id="motion-dot" title="Motion indicator"></div>
+</div>
+
+<!-- Status -->
+<div id="status-bar">
+  <span id="status-icon">⏳</span>
+  <span id="status-text">Ready</span>
+  <div id="status-sub" style="display:none"></div>
+  <span id="status-version"></span>
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <div id="camera-select-row">
+    <span id="camera-select-label">Select camera</span>
+    <div id="camera-select-wrap">
+      <div id="camera-select-face">Default rear camera</div>
+      <select id="cameraSelect" aria-label="Select camera"></select>
+      <div id="cam-picker-panel"></div>
+    </div>
+  </div>
+  <div id="no-torch-banner" style="display:none" role="alert">
+    <span>⚠️ No flashlight on this camera — RollShare will not be able to detect rolls</span>
+    <button id="no-torch-switch-btn" style="display:none">Switch ↗</button>
+  </div>
+</div>
+
+<div id="friend-name-row" aria-label="Friend display name">
+  <div id="friend-name-label-row">
+    <label id="friend-name-label" for="friend-name-input">Name</label>
+    <input id="friend-name-input" type="text" maxlength="11" placeholder="Grape" autocomplete="name" />
+  </div>
+  <div id="friend-color-row-wrap">
+    <label id="friend-color-label">Border color</label>
+    <div class="friend-color-row" id="friend-color-row" role="group" aria-label="Your pip color">
+      <button type="button" class="friend-swatch friend-swatch-blue" data-color="blue" title="Blue"></button>
+      <button type="button" class="friend-swatch friend-swatch-green" data-color="green" title="Green"></button>
+      <button type="button" class="friend-swatch friend-swatch-red" data-color="red" title="Red"></button>
+      <button type="button" class="friend-swatch friend-swatch-yellow" data-color="yellow" title="Yellow"></button>
+      <button type="button" class="friend-swatch friend-swatch-black" data-color="black" title="Black"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Action row (torch + start) -->
+<div id="action-row-wrap">
+  <div id="action-row">
+    <button id="torch-btn" title="Toggle torch">🔦 Torch</button>
+    <button id="start-btn" style="display:none">Start Camera</button>
+  </div>
+</div>
+
+<div id="upload-bar-wrap"><div id="upload-bar"></div></div>
+<div id="calib-banner" style="display:none" role="status">
+  <span id="calib-banner-text">📐 Calibrated ✓</span>
+  <button id="calib-reset-btn" type="button" title="Reset calibration">↺ Reset</button>
+</div>
+</div><!-- #cam-content -->
+
+</div><!-- #page-rotate-wrapper -->
+
+<div id="bottom-tray">
+  <button id="rotate-toggle-btn" title="Toggle page invert" onclick="(function(){
+    var isInverted = document.body.classList.contains('page-inverted');
+    if (isInverted) {
+        document.body.style.transform = 'none';
+        document.body.style.transformOrigin = '';
+        document.body.classList.remove('page-inverted');
+        document.body.style.removeProperty('--page-invert-angle');
+        localStorage.removeItem('rs_invert_angle');
+    } else {
+        var oAngle = (screen.orientation && typeof screen.orientation.angle === 'number')
+                      ? screen.orientation.angle
+                      : (typeof window.orientation === 'number' ? ((window.orientation % 360 + 360) % 360) : 0);
+        var inv = (oAngle + 180) % 360;
+        document.body.style.transform = 'rotate(' + inv + 'deg)';
+        document.body.style.transformOrigin = 'center center';
+        document.body.classList.add('page-inverted');
+        document.body.style.setProperty('--page-invert-angle', inv + 'deg');
+        localStorage.setItem('rs_invert_angle', String(inv));
+    }
+  })()"><span class="btn-icon">&#8645;</span><span class="btn-label">Flip Screen</span></button>
+  <!-- devmode toggle: shown by IIFE when ?dev=1 or by debugMode block; right side of tray -->
+  <button id="devmode-toggle-btn" title="Toggle debug log panel"><span class="btn-icon">⚙</span><span class="btn-label">Debug Log</span></button>
+</div>
+
+<div id="tap-overlay">
+  <span class="tap-icon">📷</span>
+  <span class="tap-msg">Tap anywhere to start</span>
+  <span class="tap-sub">Camera will start immediately</span>
+</div>
+<div id="inline-status" style="display:none"></div>
+<div id="dbg-panel" aria-label="Debug log"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── Constants (ported from motion_detector.py / dice_analysis.py) ─────────
+  var MOTION_THRESHOLD_MIN        = 3;
+  var MOTION_THRESHOLD_MULTIPLIER = 2.0;
+  var MOTION_NOISE_EMA_ALPHA      = 0.02;
+  var JUST_SETTLED_DELAY_FRAMES   = 5;  // ~0.42s at 12fps; was 7 (too cautious), was 4 (too fast)
+  var GRAB_SPIKE_WINDOW           = 20;
+  var GRAB_THRESHOLD              = 3.0;  // was 3.2; lowered to match diff threshold min noise floor
+
+  // ── Transport mode ────────────────────────────────────────────────────────
+  // true  → embed PNG as base64 directly in the Broadcast payload (no Storage).
+  //         Eliminates the mobile-upload + desktop-download round-trips (~400-1200ms saved).
+  // false → original path: upload to Supabase Storage, broadcast storage_path.
+  var USE_BROADCAST_INLINE = true;
+
+  // iOS Safari only allows one active camera at a time; avoid probing all cameras.
+  var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // ── MotionDetector ────────────────────────────────────────────────────────
+  function MotionDetector() {
+    this.noiseEma   = MOTION_THRESHOLD_MIN / MOTION_THRESHOLD_MULTIPLIER;
+    this.prevGray   = null;
+    this.history    = [];   // diffMean values
+    this.threshHist = [];   // threshold at each frame (parallel to history)
+    this.settleHist = [];   // {fired:bool, peak:number} parallel to history
+    this.threshold  = MOTION_THRESHOLD_MIN;
+  }
+  MotionDetector.prototype.update = function (gray) {
+    var diffMean = 0;
+    this.threshold = Math.max(MOTION_THRESHOLD_MIN, this.noiseEma * MOTION_THRESHOLD_MULTIPLIER);
+    var inMotion = false;
+    if (this.prevGray) {
+      var sum = 0;
+      for (var i = 0; i < gray.length; i++) sum += Math.abs(gray[i] - this.prevGray[i]);
+      diffMean = sum / gray.length;
+      if (diffMean < this.threshold)
+        this.noiseEma = MOTION_NOISE_EMA_ALPHA * diffMean + (1 - MOTION_NOISE_EMA_ALPHA) * this.noiseEma;
+      this.threshold = Math.max(MOTION_THRESHOLD_MIN, this.noiseEma * MOTION_THRESHOLD_MULTIPLIER);
+      inMotion = diffMean > this.threshold;
+      // Center-patch motion check — inner 4×4 of a 6×6 grid over the 160×120 small frame.
+      // Each patch is 26×20 px. The outer border ring (col/row 0 and 5) is skipped to avoid
+      // false positives from tray edges, corner shadows, and autofocus drift.  A single die
+      // spinning in place whose global mean is diluted (~0.8) will hot at least one inner
+      // patch (~30) and keep the motion flag live until it truly stops.
+      if (!inMotion) {
+        var _pw = 26, _ph = 20;  // floor(160/6), floor(120/6)
+        outerPatch: for (var _gr = 1; _gr <= 4; _gr++) {
+          for (var _gc = 1; _gc <= 4; _gc++) {
+            var _x0 = _gc * _pw, _y0 = _gr * _ph;
+            var _psum = 0;
+            for (var _py = _y0; _py < _y0 + _ph; _py++) {
+              for (var _px = _x0; _px < _x0 + _pw; _px++) {
+                _psum += Math.abs(gray[_py * 160 + _px] - this.prevGray[_py * 160 + _px]);
+              }
+            }
+            if (_psum / (_pw * _ph) > this.threshold) { inMotion = true; break outerPatch; }
+          }
+        }
+      }
+    }
+    this.prevGray = gray.slice();
+    var MAX_HIST = 300;
+    if (this.history.length >= MAX_HIST) { this.history.shift(); this.threshHist.shift(); this.settleHist.shift(); }
+    this.history.push(diffMean);
+    this.threshHist.push(this.threshold);
+    this.settleHist.push(null);  // filled in by processFrame on settle
+    return { inMotion: inMotion, diff_mean: diffMean };
+  };
+  MotionDetector.prototype.markSettle = function (peak) {
+    if (this.settleHist.length) this.settleHist[this.settleHist.length - 1] = peak;
+  };
+  MotionDetector.prototype.peakBeforeSettle = function (delay, win) {
+    var n = this.history.length, end = n - delay, start = end - win;
+    if (start < 0 || end <= 0) return 0;
+    var pk = 0;
+    for (var i = start; i < end; i++) if (this.history[i] > pk) pk = this.history[i];
+    return pk;
+  };
+  MotionDetector.prototype.reset = function () { this.prevGray = null; };
+
+  // ── Globals ───────────────────────────────────────────────────────────────
+  var APP_VERSION    = '1.1.8';
+  var GIT_COMMIT     = '305e51a';
+  var BUILD_TIME     = '2026-07-22 18:35 UTC';
+  function _collectUrlParams() {
+    var merged = new URLSearchParams(window.location.search || '');
+    var hash = window.location.hash || '';
+    var qi = hash.indexOf('?');
+    if (qi >= 0 && qi + 1 < hash.length) {
+      var hp = new URLSearchParams(hash.slice(qi + 1));
+      hp.forEach(function(v, k) {
+        if (!merged.has(k)) merged.set(k, v);
+      });
+    }
+    return merged;
+  }
+  function _isTruthyParam(v) {
+    var s = String(v || '').trim().toLowerCase();
+    return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+  }
+  var params         = _collectUrlParams();
+  var rendezvousKey  = params.get('s') || '';
+  var activeRendezvousKey = rendezvousKey;
+  var isDev          = params.get('dev') === '1';
+  var isShim         = params.get('shim') === '1';  // local relay mode — fake camera allowed
+  var isFriendMode   = _isTruthyParam(params.get('friend'));
+  // Log startup context immediately so DevTools console shows what mode we're in.
+  console.log('[rs-phoneui] STARTUP key=' + rendezvousKey.slice(-8) +
+    ' friend=' + isFriendMode + ' shim=' + isShim + ' dev=' + isDev +
+    ' relay=' + (params.get('relay') || '') +
+    ' reconnect=' + (params.get('reconnect') || ''));
+  console.log('[rs-phoneui] full key: ' + rendezvousKey);
+  // Check localStorage for any previously-stored private key for this broker
+  if (isFriendMode && rendezvousKey) {
+    var _lsCheck = null;
+    try { _lsCheck = localStorage.getItem('rs_friend_pk_' + rendezvousKey); } catch (_) {}
+    // P0-F: always forward to Companion log so we can see which path was taken
+    dbg('[startup] localStorage private key for broker ...'
+      + rendezvousKey.slice(-8) + ': ' + (_lsCheck ? '...' + _lsCheck.slice(-8) + ' (fast-path)' : 'none (broker flow)'), 'warn');
+  }
+  // 'reconnect=1' is set by _switchToFriendPrivateChannel via history.replaceState so
+  // that when iOS kills and reloads the tab, the page knows it was a friend session
+  // and can auto-start the camera and show the correct label without rescanning the QR.
+  // ?friend=1&reconnect=1 = private channel reload (already assigned, skip broker).
+  var _isFriendReconnect = _isTruthyParam(params.get('reconnect'));
+  // When reconnect=1 AND friend=1, we're already assigned — skip the broker handshake.
+  if (_isFriendReconnect && isFriendMode) {
+    isFriendMode = false;   // don't re-run broker flow; _isFriendReconnect carries the flag
+  }
+  var friendAssigned = !isFriendMode;  // true when reconnect+friend (already assigned above)
+  var friendEphemeralId = 'f' + Math.random().toString(36).slice(2, 12);
+  // Stable device identity — persists across sessions so Companion can associate
+  // calibration with this browser even after a breakout channel change or Companion reboot.
+  var _friendDeviceId = '';
+  try {
+    _friendDeviceId = localStorage.getItem('rs_friend_device_id') || '';
+    if (!_friendDeviceId) {
+      _friendDeviceId = 'fd_' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
+      localStorage.setItem('rs_friend_device_id', _friendDeviceId);
+    }
+  } catch (_e) { _friendDeviceId = 'fd_' + Math.random().toString(36).slice(2, 12); }
+  var friendDisplayName = params.get('fname') || '';
+
+  // If arriving on a broker URL (?friend=1) but we previously stored a private key
+  // for this broker key in localStorage, skip the broker entirely and connect directly
+  // to the saved private channel.  This handles the case where the browser restores
+  // the original QR URL instead of the history.replaceState URL.
+  var _LS_FRIEND_KEY_PREFIX = 'rs_friend_pk_';
+  if (isFriendMode && rendezvousKey) {
+    try {
+      var _savedPk = localStorage.getItem(_LS_FRIEND_KEY_PREFIX + rendezvousKey);
+      var _savedPkName = localStorage.getItem(_LS_FRIEND_KEY_PREFIX + rendezvousKey + '_name') || '';
+      if (_savedPk && _savedPk.length >= 10) {
+        // Already been through broker before — go straight to private channel.
+        isFriendMode = false;
+        _isFriendReconnect = true;
+        friendAssigned = true;
+        activeRendezvousKey = _savedPk;
+        friendDisplayName = _savedPkName || friendDisplayName;
+        // Also update the address bar so future reloads skip this lookup.
+        try {
+          var _np2 = new URLSearchParams(window.location.search || '');
+          _np2.set('s', _savedPk);
+          _np2.set('friend', '1');    // keep friend=1 so UI stays in friend mode
+          _np2.set('reconnect', '1');
+          if (_savedPkName) _np2.set('fname', _savedPkName); else _np2.delete('fname');
+          history.replaceState(null, '', '?' + _np2.toString() + (window.location.hash || ''));
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  if (isFriendMode || _isFriendReconnect) {
+    function _initFriendModeUI() {
+      var _h1 = document.querySelector('header h1');
+      if (_h1) _h1.textContent = 'RollShare';
+      var _sub = document.getElementById('friend-mode-sub');
+      if (_sub) _sub.style.display = 'inline-flex';
+      var _friendRow = document.getElementById('friend-name-row');
+      var _friendInput = document.getElementById('friend-name-input');
+      if (_friendRow) _friendRow.style.display = 'block';
+      if (_friendInput) {
+        // Only allow alphanumeric characters (no spaces) — shared constraint with
+        // the primary pip-title-input in companion.html.
+        _friendInput.addEventListener('keypress', function(e) {
+          var ch = e.key;
+          if (ch && ch.length === 1 && !/^[A-Za-z0-9]$/.test(ch)) {
+            e.preventDefault();
+          }
+        });
+        try {
+          var _saved = localStorage.getItem('rs_friend_name') || '';
+          if (_saved) _friendInput.value = _saved;
+        } catch (_) {}
+        friendDisplayName = (_friendInput.value || '').trim().slice(0, 64);
+        var _sendNameUpdate = function() {
+          if (broadcastChannel && friendAssigned) {
+            broadcastChannel.send({
+              type: 'broadcast', event: 'broadcast',
+              payload: { type: 'name_update', name: friendDisplayName },
+            }).catch(function() {});
+          }
+        };
+        _friendInput.addEventListener('input', function () {
+          friendDisplayName = (this.value || '').trim().slice(0, 64);
+          try { localStorage.setItem('rs_friend_name', friendDisplayName); } catch (_) {}
+          _sendNameUpdate();
+        });
+        _friendInput.addEventListener('change', function () {
+          friendDisplayName = (this.value || '').trim().slice(0, 64);
+          try { localStorage.setItem('rs_friend_name', friendDisplayName); } catch (_) {}
+          _sendNameUpdate();
+        });
+      }
+      // Load saved colour and wire up the colour picker
+      try {
+        var _savedColor = localStorage.getItem('rs_friend_color') || '';
+        var _validColors = ['blue','green','red','yellow','black','current'];
+        if (_savedColor && _validColors.indexOf(_savedColor) >= 0) friendPipColor = _savedColor;
+      } catch (_) {}
+      var _friendColorRow = document.getElementById('friend-color-row');
+      if (_friendColorRow) {
+        _friendColorRow.querySelectorAll('.friend-swatch').forEach(function(btn) {
+          btn.classList.toggle('is-selected', btn.dataset.color === friendPipColor);
+        });
+        _friendColorRow.addEventListener('click', function(e) {
+          var btn = e.target.closest('.friend-swatch');
+          if (!btn) return;
+          friendPipColor = btn.dataset.color || 'blue';
+          _friendColorRow.querySelectorAll('.friend-swatch').forEach(function(b) { b.classList.remove('is-selected'); });
+          btn.classList.add('is-selected');
+          try { localStorage.setItem('rs_friend_color', friendPipColor); } catch (_) {}
+          // Push colour update to companion immediately if already on private channel
+          if (broadcastChannel && friendAssigned) {
+            broadcastChannel.send({
+              type: 'broadcast', event: 'broadcast',
+              payload: { type: 'pip_color_update', pip_color: friendPipColor },
+            }).catch(function() {});
+          }
+        });
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', _initFriendModeUI, { once: true });
+    } else {
+      _initFriendModeUI();
+    }
+  }
+
+  // ── Fake camera (shim/dev mode) ───────────────────────────────────────────
+  // When ?shim=1 is set, replace getUserMedia with a synthetic canvas stream
+  // so "Start camera" works without a real device.  The dev panel can then
+  // swap to noise / blocks / dice-clip feeds as usual.
+  if (isShim && typeof MediaStream !== 'undefined') {
+    var _fakeCanvas = document.createElement('canvas');
+    _fakeCanvas.width = 320; _fakeCanvas.height = 240;
+    // Draw a still empty-tray photo so the DiceAnalyzer can capture a real background.
+    // Falls back to a dark fill if the image fails to load (cross-origin, etc.).
+    (function _paintFake() {
+      var ctx = _fakeCanvas.getContext('2d');
+      ctx.fillStyle = '#1a1a0e';
+      ctx.fillRect(0, 0, 320, 240);
+      var _bgImg = new Image();
+      _bgImg.onload = function () {
+        // Draw the tray image, then keep redrawing it at ~2 fps to hold the still.
+        (function _loop() {
+          ctx.drawImage(_bgImg, 0, 0, 320, 240);
+          setTimeout(_loop, 500);
+        })();
+      };
+      _bgImg.onerror = function () {
+        // Fallback: label so it's obvious the image failed
+        ctx.fillStyle = '#4af';
+        ctx.font = '13px monospace';
+        ctx.fillText('Empty tray (shim)', 8, 120);
+      };
+      _bgImg.src = '../../assets/paper_tray_00.jpg';
+    })();
+    var _fakeGetUserMedia = function() {
+      var stream = _fakeCanvas.captureStream ? _fakeCanvas.captureStream(10) : new MediaStream();
+      return Promise.resolve(stream);
+    };
+    var _fakeEnumerateDevices = function() {
+      return Promise.resolve([{ kind: 'videoinput', deviceId: 'fake', label: 'Fake Camera (shim)', groupId: '' }]);
+    };
+    // Patch methods on the existing mediaDevices object (it's read-only in Chrome).
+    if (navigator.mediaDevices) {
+      try { navigator.mediaDevices.getUserMedia = _fakeGetUserMedia; } catch(_) {}
+      try { navigator.mediaDevices.enumerateDevices = _fakeEnumerateDevices; } catch(_) {}
+    } else {
+      try {
+        Object.defineProperty(navigator, 'mediaDevices', {
+          value: { getUserMedia: _fakeGetUserMedia, enumerateDevices: _fakeEnumerateDevices },
+          configurable: true,
+        });
+      } catch(_) {}
+    }
+  }
+
+  var video           = document.getElementById('cam-video');
+  var previewOverlay  = document.getElementById('preview-overlay');
+  var motionDot       = document.getElementById('motion-dot');
+  var statusIcon      = document.getElementById('status-icon');
+  var statusText      = document.getElementById('status-text');
+  var statusSub       = document.getElementById('status-sub');
+  var startBtn        = document.getElementById('start-btn');
+  var torchBtn        = document.getElementById('torch-btn');
+  var cameraSelect    = document.getElementById('cameraSelect');
+  var cameraFace      = document.getElementById('camera-select-face');
+  var camPickerPanel  = document.getElementById('cam-picker-panel');
+  var errorBanner     = document.getElementById('error-banner');
+  var errorTitle      = document.getElementById('error-title');
+  var errorMsg        = document.getElementById('error-msg');
+  var uploadWrap      = document.getElementById('upload-bar-wrap');
+  var uploadBar       = document.getElementById('upload-bar');
+
+  var motionDetector  = new MotionDetector();
+  var supabase        = null;
+  var broadcastChannel = null;   // Supabase Realtime broadcast channel
+  var _companionEverPresent = false; // true once companion presence confirmed this session
+  var _cachedGeoLat = null;       // cached from geolocation; re-sent on private channel connect
+  var _cachedGeoLon = null;
+  var currentStream   = null;
+  var videoTrack      = null;
+  var torchEnabled    = false;
+  var torchIds        = new Set();
+  var currentDeviceId = null;
+  var cameraStarted   = false;
+  var noTorchBanner   = document.getElementById('no-torch-banner');
+  var noTorchSwitchBtn = document.getElementById('no-torch-switch-btn');
+  var frameSeq        = 0;
+  var lastMotionFrame = 0;
+  var settleFired     = false;
+  var uploading       = false;
+  var anonSignedIn    = false;   // set true once signInAnonymously() resolves
+  var _grabPreviewSent = false;  // true once display-only preview has been sent for current throw
+  var _sendFrameOnStart = false; // set true on camera start; processFrame sends one display frame then clears
+  var frameTimerId    = null;
+  var _camSettleUntil = 0;   // epoch ms; processFrame skips diff+send until this passes (AE settle after cam switch)
+  var sfCanvas        = null;
+  var capCanvas       = null;
+
+  // Battery level (0.0–1.0) from Battery Status API; null if unavailable (e.g. iOS Safari).
+  var _batteryLevel = null;
+  var _lastBatteryPct = null;
+  var _lastBatteryDecileSent = null;
+  function _batteryPct(level) {
+    if (level === null || level === undefined) return null;
+    return Math.max(0, Math.min(100, Math.floor((level * 100) + 1e-6)));
+  }
+  function _sendBatteryDecileUpdate(pct) {
+    if (!broadcastChannel || pct === null || pct === undefined) return;
+    if (_lastBatteryDecileSent === pct) return;
+    _lastBatteryDecileSent = pct;
+    broadcastChannel.send({
+      type: 'broadcast',
+      event: 'battery_update',
+      payload: {
+        type: 'battery_update',
+        battery_level: _batteryLevel,
+        battery_pct: pct,
+        ts: Date.now(),
+      },
+    }).catch(function () {});
+    dbg('battery milestone tx=' + pct + '%');
+  }
+  function _updateBatteryDisplay(level) {
+    var el = document.getElementById('battery-display');
+    if (!el) return;
+    if (level === null || level === undefined) { el.style.display = 'none'; return; }
+    var pct = Math.round(level * 100);
+    el.textContent = 'Battery: ' + pct + '%';
+    el.style.color = level < 0.25 ? '#f87171' : '#86efac';
+    el.style.display = '';
+  }
+  if (navigator.getBattery) {
+    navigator.getBattery().then(function(bat) {
+      _batteryLevel = bat.level;
+      _lastBatteryPct = _batteryPct(_batteryLevel);
+      _updateBatteryDisplay(_batteryLevel);
+      bat.addEventListener('levelchange', function() {
+        var _prevPct = _lastBatteryPct;
+        _batteryLevel = bat.level;
+        var _nextPct = _batteryPct(_batteryLevel);
+        _lastBatteryPct = _nextPct;
+        _updateBatteryDisplay(_batteryLevel);
+        if (_prevPct !== null && _nextPct !== null && _nextPct < _prevPct && (_nextPct === 5 || (_nextPct > 0 && (_nextPct % 10) === 0))) {
+          _sendBatteryDecileUpdate(_nextPct);
+        }
+      });
+    }).catch(function() {});
+  }
+
+  // Friend session colour — loaded from localStorage, sent in hello payload.
+  var friendPipColor = 'blue';
+
+  // ── Friend die-size calibration ─────────────────────────────────────────
+  // Calibration wizard runs on the host; progress is shown on the pip overlay.
+  // The phone only needs to know when calibration is done so it can show the
+  // Reset button (allowing the user to re-enter the wizard).
+  var _friendCalibDone = false;  // true once host signals done:true
+
+  var _hostYoloOnly = false;  // true when host is in yolo-only mode (no calibration needed)
+
+  function _updateCalibBanner() {
+    var banner = document.getElementById('calib-banner');
+    if (!banner) return;
+    // Only show the banner (with Reset button) once calibration is complete,
+    // and only when the host is NOT in yolo-only mode (which skips calibration entirely).
+    banner.style.display = ((isFriendMode || _isFriendReconnect) && _friendCalibDone && !_hostYoloOnly) ? 'flex' : 'none';
+  }
+
+  // Initialise calibration state (call after isFriendMode / _isFriendReconnect is known)
+  if (isFriendMode || _isFriendReconnect) {
+    // Banner shown once camera starts / private channel assigned;
+    // wire up the Reset button now so the handler is always attached.
+    var _calibResetBtn = document.getElementById('calib-reset-btn');
+    if (_calibResetBtn) {
+      _calibResetBtn.addEventListener('click', function () {
+        _friendCalibDone = false;
+        _updateCalibBanner();
+        // Tell the host to reset its wizard state too.
+        // broadcastChannel may still be null if we just switched to the private
+        // channel (it reconnects asynchronously).  Retry once it's ready.
+        function _sendCalibReset() {
+          if (broadcastChannel) {
+            broadcastChannel.send({
+              type: 'broadcast', event: 'calib_reset',
+              payload: { type: 'calib_reset' },
+            }).catch(function () {});
+            dbg('friend calib reset by user');
+          } else {
+            // Channel not yet open — retry in 200 ms.
+            setTimeout(_sendCalibReset, 200);
+          }
+        }
+        _sendCalibReset();
+      });
+    }
+  }
+
+  function _canSendFrames() {
+    return !isFriendMode || friendAssigned;
+  }
+
+  function _helloEventName() {
+    return (isFriendMode && !friendAssigned) ? 'friend_hello' : 'hello';
+  }
+
+  function _helloPayload() {
+    var base = {
+      app_version: APP_VERSION,
+      build_time: BUILD_TIME,
+      js_build_time: (window.RS_JS_BUILD_TIME && window.RS_JS_BUILD_TIME !== '__JS_BUILD_TIME__') ? window.RS_JS_BUILD_TIME : '',
+      ua: navigator.userAgent,
+      platform: navigator.platform || '',
+      screen: screen.width + 'x' + screen.height,
+      dpr: window.devicePixelRatio || 1,
+      tz: (Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '') || '',
+      ts: Date.now(),
+      battery_level: _batteryLevel,
+    };
+    if (isFriendMode && !friendAssigned) {
+      base.type = 'friend_hello';
+      base.ephemeral_id = friendEphemeralId;
+      base.name = friendDisplayName || 'Friend';
+      base.device_id = _friendDeviceId;  // stable identity for calibration keying
+    } else {
+      base.type = 'hello';
+      if (isFriendMode || _isFriendReconnect) {
+        base.pip_color = friendPipColor;
+        base.device_id = _friendDeviceId;  // stable identity for calibration keying
+      }
+    }
+    return base;
+  }
+
+  // Re-send hello on key lifecycle edges (for example: camera start) to
+  // avoid startup races where Companion missed the initial hello.
+  function _sendHello(reason) {
+    if (!broadcastChannel) return;
+    var payload = _helloPayload();
+    if (reason) payload.reason = reason;
+    broadcastChannel.send({
+      type: 'broadcast',
+      event: _helloEventName(),
+      payload: payload,
+    }).catch(function () {});
+    dbg('hello tx event=' + _helloEventName() + (reason ? ' reason=' + reason : ''));
+  }
+
+  function _switchToFriendPrivateChannel(friendKey, friendName) {
+    if (!friendKey) return;
+    console.log('[rs-phoneui] _switchToFriendPrivateChannel: key=' + friendKey + ' name=' + friendName);
+    dbg('switching to private channel key=...' + friendKey.slice(-8) + ' name=' + friendName);
+    friendAssigned = true;
+    activeRendezvousKey = friendKey;
+    friendDisplayName = friendName || friendDisplayName || 'Friend';
+    // Pre-fill name input with broker-assigned name if the user hasn't typed anything yet
+    var _ni = document.getElementById('friend-name-input');
+    if (_ni && !_ni.value.trim()) {
+      _ni.value = friendDisplayName;
+      try { localStorage.setItem('rs_friend_name', friendDisplayName); } catch (_) {}
+    }
+    setStatus('🔐', 'Friend channel ready', 'Connected to private friend lane');
+    if (supabase && broadcastChannel && typeof supabase.removeChannel === 'function') {
+      try { supabase.removeChannel(broadcastChannel); } catch (_) {}
+    }
+    broadcastChannel = null;
+    // Rewrite the URL to the private key so that if iOS kills and reloads this
+    // tab the page comes back on the persistent private channel instead of the
+    // now-stale broker key.  Strip 'friend=1' so the reloaded page treats itself
+    // as a normal (non-broker) connection and sends a plain 'hello' — which the
+    // Companion reconnect listener expects.
+    // Add 'reconnect=1' and 'fname=<name>' so the reloaded page auto-starts the
+    // camera and shows the correct friend label in the session chip.
+    try {
+      var _np = new URLSearchParams(window.location.search || '');
+      _np.set('s', friendKey);
+      _np.set('friend', '1');    // keep friend=1 so reload stays in friend-mode UI
+      _np.set('reconnect', '1');
+      var _fname = (friendName || friendDisplayName || '').trim().slice(0, 64);
+      if (_fname) _np.set('fname', _fname); else _np.delete('fname');
+      history.replaceState(null, '', '?' + _np.toString() + (window.location.hash || ''));
+    } catch (_) {}
+    // Also persist in localStorage keyed by the original broker key so that if the
+    // browser restores the original QR URL on next reload, we still skip the broker.
+    try {
+      var _brokerKey = rendezvousKey; // captured from outer scope at page-load time
+      var _fnameStore = (friendName || friendDisplayName || '').trim().slice(0, 64);
+      if (_brokerKey) {
+        localStorage.setItem(_LS_FRIEND_KEY_PREFIX + _brokerKey, friendKey);
+        localStorage.setItem(_LS_FRIEND_KEY_PREFIX + _brokerKey + '_name', _fnameStore);
+      }
+    } catch (_) {}
+    // Calibration state is owned entirely by the Companion app (stored on local disk).
+    // When the channel is established Companion will send calib_progress { done: true }
+    // if a saved calibration exists, which drives the banner via the existing handler.
+    if (cameraStarted) _updateCalibBanner();
+    initSupabase(true);
+  }
+
+  // ── Rendezvous key validation ─────────────────────────────────────────────
+  // In shim/dev mode accept any non-empty key (allows short test keys like DEVTEST001).
+  var _keyMinLen = (isShim || isDev) ? 1 : 10;
+  if (!rendezvousKey || rendezvousKey.length < _keyMinLen) {
+    showError('Invalid link', 'This QR code is missing the rendezvous key. Please rescan the QR code shown on the RollShare Companion App.');
+    startBtn.disabled = true;
+  } else {
+    // Connect to the broadcast channel immediately so Companion sees "Phone connected"
+    // before the user taps Start Streaming.
+    initSupabase();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showError(title, msg) {
+    errorTitle.textContent = title;
+    errorMsg.textContent   = msg;
+    errorBanner.style.display = 'block';
+  }
+  function setStatus(icon, text, sub) {
+    statusIcon.textContent = icon;
+    statusText.textContent = text;
+    statusSub.textContent  = sub || '';
+  }
+  // hasTorch / deviceIdFromTrack / openStreamForDevice / probeTorchIds
+  // are now provided by RsCameraSelector (rs-phoneui-shared.js).
+
+  // ── Camera selector ───────────────────────────────────────────────────────
+  function syncFace() {
+    var opt = cameraSelect.options[cameraSelect.selectedIndex];
+    cameraFace.textContent = (opt && opt.textContent) ? opt.textContent : 'Default rear camera';
+  }
+
+  // Show the no-torch warning banner when the active camera lacks a torch.
+  // Show Switch whenever there is another camera available — on Android the cold
+  // probe often fails (can't open streams while one is active), so torchIds may
+  // be empty even though other cameras have a torch.  Let the user try.
+  function updateNoTorchBanner() {
+    if (!noTorchBanner || !cameraStarted) return;
+    var activeHasTorch = RsCameraSelector.hasTorchCapability(videoTrack);
+    // Update torchIds with what the warm active track reports.
+    var _aid = RsCameraSelector.deviceIdFromTrack(videoTrack) || currentDeviceId || '';
+    if (_aid) {
+      if (activeHasTorch) torchIds.add(_aid);
+      else torchIds.delete(_aid);
+    }
+    noTorchBanner.style.display = activeHasTorch ? 'none' : '';
+    // Show Switch only on iOS (Android cold-probe can't reliably identify which
+    // camera has a torch while the stream is active, so the button picks poorly).
+    var _hasOtherCam = !IS_IOS ? false :
+      Array.from(cameraSelect.options).some(function(o) { return o.value && o.value !== _aid; });
+    if (noTorchSwitchBtn) noTorchSwitchBtn.style.display = _hasOtherCam ? '' : 'none';
+  }
+
+  if (noTorchSwitchBtn) {
+    noTorchSwitchBtn.addEventListener('click', async function () {
+      var _aid = RsCameraSelector.deviceIdFromTrack(videoTrack) || currentDeviceId || '';
+      var targetId = null;
+      function _isRearLabel(lbl) {
+        var l = (lbl || '').toLowerCase();
+        return l.includes('back') || l.includes('rear') || l.includes('environment') || l.includes('main');
+      }
+      // Pass 1: known torch-capable rear camera.
+      for (var i = 0; i < cameraSelect.options.length; i++) {
+        var v = cameraSelect.options[i].value;
+        if (v && v !== _aid && torchIds.has(v) && _isRearLabel(cameraSelect.options[i].textContent)) { targetId = v; break; }
+      }
+      // Pass 2: any known torch-capable camera.
+      if (!targetId) {
+        for (var i = 0; i < cameraSelect.options.length; i++) {
+          var v = cameraSelect.options[i].value;
+          if (v && v !== _aid && torchIds.has(v)) { targetId = v; break; }
+        }
+      }
+      // Pass 3: rear-sounding camera even if not in torchIds (Android cold-probe bypass).
+      if (!targetId) {
+        for (var i = 0; i < cameraSelect.options.length; i++) {
+          var v = cameraSelect.options[i].value;
+          if (v && v !== _aid && _isRearLabel(cameraSelect.options[i].textContent)) { targetId = v; break; }
+        }
+      }
+      // Pass 4: any other camera (last resort).
+      if (!targetId) {
+        for (var i = 0; i < cameraSelect.options.length; i++) {
+          var v = cameraSelect.options[i].value;
+          if (v && v !== _aid) { targetId = v; break; }
+        }
+      }
+      if (!targetId) return;
+      cameraSelect.value = targetId;
+      syncFace();
+      torchEnabled = false; refreshTorchBtn();
+      try { await openCamera(targetId); }
+      catch (err) { showError('Camera switch failed', err.message || String(err)); return; }
+      // After switching, re-populate picker with updated torch info from warm track.
+      await populateCameras(targetId, Array.from(cameraSelect.options).slice(1).map(function(o) {
+        return { deviceId: o.value, label: o.textContent.replace(/\s*🔦$/, '').trim() };
+      }), torchIds);
+      _sendCamLabel();
+      updateNoTorchBanner();
+    });
+  }
+
+  function _sendCamLabel() {
+    var opt = cameraSelect.options[cameraSelect.selectedIndex];
+    var label = (opt && opt.value) ? (opt.textContent || '').replace(/\s*🔦$/, '').trim() : '';
+    if (!label) return;
+    // Persist so the next session can restore the same camera.
+    try {
+      localStorage.setItem('rs_last_cam_id', opt.value || '');
+      localStorage.setItem('rs_last_cam_label', label);
+    } catch (_) {}
+    if (!broadcastChannel || !_canSendFrames()) return;
+    broadcastChannel.send({
+      type: 'broadcast', event: 'broadcast',
+      payload: { type: 'cam_label', label: label },
+    }).catch(function() {});
+  }
+
+  async function populateCameras(selectedId, inputs, tIds) {
+    RsCameraSelector.populateSelectEl(cameraSelect, selectedId, inputs, tIds);
+    syncFace();
+    RsCameraSelector.populatePickerPanel(camPickerPanel, cameraSelect, cameraFace);
+  }
+
+  // Custom picker toggle — face click opens/closes the in-DOM panel
+  cameraFace.addEventListener('click', function(e) {
+    e.stopPropagation();
+    camPickerPanel.classList.toggle('open');
+  });
+  document.addEventListener('click', function() {
+    camPickerPanel.classList.remove('open');
+  });
+
+  async function openCamera(deviceId) {
+    if (currentStream) { currentStream.getTracks().forEach(function(t) { t.stop(); }); currentStream = null; videoTrack = null; }
+    var stream = await RsCameraSelector.openStreamForDevice(deviceId);
+    currentStream = stream;
+    videoTrack    = stream.getVideoTracks()[0] || null;
+    video.srcObject = stream;
+    previewOverlay.classList.add('hidden');
+    await video.play();
+    // Torch button + auto-enable
+    if (RsCameraSelector.hasTorchCapability(videoTrack)) {
+      torchBtn.style.display = '';
+      try {
+        await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
+        torchEnabled = true;
+      } catch (_) { torchEnabled = false; }
+    } else {
+      torchBtn.style.display = 'none'; torchEnabled = false;
+    }
+    refreshTorchBtn();
+    currentDeviceId = deviceId;
+    // Allow 2 s for auto-exposure to stabilise after the torch fires / stream opens.
+    // processFrame will skip diff detection and frame sends until this window passes.
+    // E2E tests inject window.__skipCamSettle=true (synthetic_camera.js) to bypass this.
+    _camSettleUntil = window.__skipCamSettle ? 0 : Date.now() + 2000;
+    settleFired = false;
+    lastMotionFrame = frameSeq;  // discard any motion that accumulated during the switch
+    // Reset the motion detector baseline so the first diff after the settle window is
+    // computed against the post-AE frame, not the bright pre-switch/pre-torch frame.
+    // Without this, the large brightness delta triggers a false inMotion spike and can
+    // cause uploadSettledFrame to fire with a still-blown-out frame.
+    motionDetector.reset();
+  }
+
+  // ── Torch ─────────────────────────────────────────────────────────────────
+  function refreshTorchBtn() {
+    if (torchEnabled) { torchBtn.textContent = '🔦 Torch ON'; torchBtn.classList.add('on'); }
+    else              { torchBtn.textContent = '🔦 Torch';     torchBtn.classList.remove('on'); }
+  }
+
+  async function _reassertTorchAfterResume(reason) {
+    if (!cameraStarted || !videoTrack || !torchEnabled) return;
+    if (!RsCameraSelector.hasTorchCapability(videoTrack)) return;
+    try {
+      var _before = videoTrack.getSettings ? (videoTrack.getSettings() || {}) : {};
+      // Some browsers turn torch off while backgrounded but keep the track alive.
+      if (Object.prototype.hasOwnProperty.call(_before, 'torch') && _before.torch === true) return;
+      await videoTrack.applyConstraints({ advanced: [{ torch: true }] });
+      var _after = videoTrack.getSettings ? (videoTrack.getSettings() || {}) : {};
+      if (Object.prototype.hasOwnProperty.call(_after, 'torch') && _after.torch !== true) {
+        throw new Error('camera did not confirm torch state on resume');
+      }
+      dbg('torch reasserted after resume (' + (reason || 'unknown') + ')');
+      refreshTorchBtn();
+    } catch (err) {
+      console.warn('torch resume reassert failed:', err);
+      dbg('torch reassert failed after resume (' + (reason || 'unknown') + '): ' + String(err), 'warn');
+      // Visible breadcrumb so failures are diagnosable without opening DevTools.
+      if (document.visibilityState === 'visible') {
+        setStatus('⚠️', 'Torch restore failed', 'Tap the Torch button to re-enable flashlight');
+      }
+    }
+  }
+
+  torchBtn.addEventListener('click', async function () {
+    if (!videoTrack) return;
+    torchBtn.disabled = true;
+    var target = !torchEnabled;
+    try {
+      await videoTrack.applyConstraints({ advanced: [{ torch: target }] });
+      var s = videoTrack.getSettings ? videoTrack.getSettings() : {};
+      if (Object.prototype.hasOwnProperty.call(s, 'torch') && s.torch !== target)
+        throw new Error('camera did not confirm torch state');
+      torchEnabled = target;
+    } catch (err) { console.warn('torch toggle failed:', err); }
+    refreshTorchBtn();
+    torchBtn.disabled = false;
+  });
+
+  // ── Camera selector change ────────────────────────────────────────────────
+  cameraSelect.addEventListener('change', async function () {
+    syncFace();
+    if (!cameraStarted) return;
+    var newId = cameraSelect.value || null;
+    torchEnabled = false; refreshTorchBtn();
+    try { await openCamera(newId); }
+    catch (err) { showError('Camera switch failed', err.message || String(err)); }
+    // Update torchIds from warm track now that the new camera is open.
+    updateNoTorchBanner();
+    // Re-populate picker so the 🔦 icon appears on the newly-confirmed torch camera.
+    var _fvids = Array.from(cameraSelect.options).filter(function(o) { return o.value; }).map(function(o) {
+      return { deviceId: o.value, label: o.textContent.replace(/\s*🔦$/, '').trim() };
+    });
+    await populateCameras(newId || '', _fvids, torchIds);
+    _sendCamLabel();  // report new camera label to Companion
+  });
+
+  // ── Supabase ──────────────────────────────────────────────────────────────
+  var SUPABASE_URL      = 'https://kkcgxhjsnhhwnmbtfwai.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrY2d4aGpzbmhod25tYnRmd2FpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTM3NjIsImV4cCI6MjA5MzE2OTc2Mn0.s-xTOZxkBAJx1VMS1-l0JJjg-hx901iYa2wkT5M05m0';
+
+  function initSupabase(forceChannelRefresh) {
+    if (supabase && broadcastChannel && !forceChannelRefresh) return true;
+    try {
+      var sb = window.supabase || (window.supabaseJs || null);
+      if (sb && sb.createClient) {
+        if (!supabase) supabase = sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        if (forceChannelRefresh && broadcastChannel && typeof supabase.removeChannel === 'function') {
+          try { supabase.removeChannel(broadcastChannel); } catch (_) {}
+          broadcastChannel = null;
+        }
+        // Sign in anonymously so uploads use an authenticated JWT (storage-api
+        // requires non-null auth.uid(); bare anon key has null uid).
+        if (!anonSignedIn) {
+          supabase.auth.signInAnonymously().then(function(res) {
+            if (res.error) {
+              dbg('anon sign-in failed: ' + res.error.message, 'error');
+              // Surface a visible warning — uploads will be blocked until this is resolved
+              setStatus('⚠️', 'Sign-in failed', 'Anonymous auth error: ' + res.error.message);
+            } else {
+              anonSignedIn = true;
+              dbg('anon sign-in ok uid=' + (res.data && res.data.user ? res.data.user.id.slice(-6) : '?'));
+            }
+          });
+        }
+        // Subscribe to Companion shutdown broadcasts and presence disconnect
+        dbg('subscribing to broadcast channel cloud:' + activeRendezvousKey.slice(-8));
+        console.log('[rs-phoneui] initSupabase: subscribing to cloud:' + activeRendezvousKey +
+          ' (friendAssigned=' + friendAssigned + ')');
+        broadcastChannel = supabase
+          .channel('cloud:' + activeRendezvousKey)
+          .on('presence', { event: 'leave' }, function (payload) {
+            if (isShim) return; // relay doesn't support presence; ignore
+            dbg('presence leave raw: ' + JSON.stringify((payload && payload.leftPresences) ? payload.leftPresences.map(function(p){return p.user;}) : payload), 'warn');
+            var left = (payload && payload.leftPresences) || [];
+            var companionLeft = left.some(function (p) { return p.user === 'companion'; });
+            if (companionLeft) {
+              dbg('companion presence leave', 'warn');
+              _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
+            }
+          })
+          .on('presence', { event: 'sync' }, function () {
+            try {
+              var _ps = broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+              var _keys = Object.values(_ps).map(function(pp) { return Array.isArray(pp) ? pp.map(function(p){return p.user;}) : pp; });
+              dbg('presence sync: state=' + JSON.stringify(_keys));
+              var _companionPresent = Object.values(_ps).some(function(pp) {
+                return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+              });
+              if (_companionPresent) {
+                _companionEverPresent = true;
+                dbg('presence sync: companion present — re-tracking and re-sending hello');
+                // Cancel broker-fallback timer: Companion is confirmed present.
+                if (window._brokerFallbackId != null) {
+                  clearTimeout(window._brokerFallbackId);
+                  window._brokerFallbackId = null;
+                }
+                broadcastChannel.track({ user: 'phone' });
+                broadcastChannel.send({
+                  type: 'broadcast', event: _helloEventName(),
+                  payload: _helloPayload(),
+                }).catch(function () {});
+                if (document.getElementById('zombie-overlay')) {
+                  _dismissZombieOverlay();
+                  if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+                }
+              } else if (cameraStarted && !isShim && _companionEverPresent) {
+                // Synced but companion is not present and camera is running — companion
+                // went away without us seeing a leave event (silent WS drop on our side).
+                // Guard: only fire if companion was previously seen (avoids false zombie
+                // in test environments or fresh sessions without companion yet).
+                dbg('presence sync: companion absent while camera running — showing zombie', 'warn');
+                _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
+              }
+            } catch (_) {}
+          })
+          .on('presence', { event: 'join' }, function (payload) {
+            // Companion restarted and rejoined the same channel — dismiss zombie if showing.
+            var joined = (payload && payload.newPresences) || [];
+            var companionJoined = joined.some(function (p) { return p.user === 'companion'; });
+            if (companionJoined) {
+              _companionEverPresent = true;
+              // Cancel the broker-fallback timer: Companion is present, private channel is alive.
+              if (window._brokerFallbackId != null) {
+                clearTimeout(window._brokerFallbackId);
+                window._brokerFallbackId = null;
+                dbg('broker fallback timer cancelled (companion joined)', 'info');
+              }
+              // Re-track and re-send hello when companion joins/rejoins.
+              // On the broker channel, only re-send if we haven't been assigned yet AND
+              // this is a rejoin (zombie recovery) — not on first join since SUBSCRIBED
+              // already sent friend_hello. On the private channel always re-send.
+              broadcastChannel.track({ user: 'phone' });
+              if (friendAssigned || isFriendMode || document.getElementById('zombie-overlay')
+                  || (!isFriendMode && cameraStarted)) {
+                // friendAssigned         → private channel: always re-send hello.
+                // isFriendMode          → still on broker, not yet assigned: re-send friend_hello
+                //                         so Companion can issue a fresh friend_assign after restart.
+                // zombie-overlay        → primary path recovery: re-send hello.
+                // primary + cameraStarted → quick restart: no zombie was shown but session is
+                //                           stale; re-introduce so Companion knows we're here.
+                broadcastChannel.send({
+                  type: 'broadcast', event: _helloEventName(),
+                  payload: _helloPayload(),
+                }).catch(function () {});
+              }
+              if (document.getElementById('zombie-overlay')) {
+                dbg('companion presence join — dismissing zombie overlay');
+                _dismissZombieOverlay();
+                // Auto-restart the camera so the user gets a live feed immediately.
+                if (!cameraStarted) {
+                  setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+                }
+              } else {
+                dbg('companion presence join — re-sent hello');
+              }
+            }
+            // [e] Another phone tab joined (user rescanned QR in a new tab) — this tab
+            // is now stale. Stop the zombie countdown and tell the user to close this tab.
+            var phoneJoined = joined.some(function (p) { return p.user === 'phone'; });
+            if (phoneJoined && document.getElementById('zombie-overlay')) {
+              dbg('new phone tab joined — this tab is superseded');
+              if (_zombieTimerId !== null) { clearTimeout(_zombieTimerId); _zombieTimerId = null; }
+              var _cdEl = document.getElementById('zombie-countdown');
+              if (_cdEl) {
+                _cdEl.textContent = 'Session resumed in a new scan \u2014 you can close this tab.';
+                _cdEl.style.color = '#aaa';
+              }
+            }
+          })
+          .on('broadcast', { event: 'companion_hello' }, function (payload) {
+            // Companion just joined (or restarted). Check whether it is running a newer
+            // build than this page. If so, force-reload to pick up the latest phoneui-cloud.html.
+            // APP_VERSION and BUILD_TIME are stamped at deploy time — compare semver.
+            var bcast = (payload && payload.payload) || payload || {};
+            var theirVer = (bcast.app_version || '').replace(/^v/, '');
+            var myVer    = (APP_VERSION || '').replace(/^v/, '').replace('1.1.8', '');
+            dbg('companion_hello v=' + theirVer + ' (us=' + myVer + ')');
+            // Cancel the broker-fallback timer: Companion is present.
+            if (window._brokerFallbackId != null) {
+              clearTimeout(window._brokerFallbackId);
+              window._brokerFallbackId = null;
+            }
+            // companion_hello = Companion is live. Dismiss zombie overlay only if companion
+            // presence is also confirmed — guards against a briefly-lived companion restart
+            // that sends hello then crashes before presence is fully tracked.  If presence
+            // isn't here yet, the presence 'join' handler will dismiss as soon as it arrives.
+            if (document.getElementById('zombie-overlay')) {
+              var _cpConfirmed = false;
+              try {
+                var _ps3 = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                _cpConfirmed = Object.values(_ps3).some(function(pp) {
+                  return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                });
+              } catch (_) {}
+              if (_cpConfirmed) {
+                _companionEverPresent = true;
+                dbg('companion_hello: presence confirmed — dismissing zombie overlay');
+                _dismissZombieOverlay();
+                if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+              } else {
+                // Presence may not have synced yet (iOS Safari WS can lag behind broadcast).
+                // Poll up to 3 times at 500 ms intervals before giving up — presence join
+                // will also dismiss if it arrives independently.
+                dbg('companion_hello: presence not yet confirmed — polling...', 'warn');
+                var _pollCount = 0;
+                var _pollId = setInterval(function () {
+                  _pollCount++;
+                  if (!document.getElementById('zombie-overlay')) { clearInterval(_pollId); return; }
+                  var _pConfirmed = false;
+                  try {
+                    var _ps4 = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                    _pConfirmed = Object.values(_ps4).some(function(pp) {
+                      return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                    });
+                  } catch (_) {}
+                  if (_pConfirmed) {
+                    clearInterval(_pollId);
+                    _companionEverPresent = true;
+                    dbg('companion_hello: presence confirmed after poll #' + _pollCount + ' — dismissing zombie overlay');
+                    _dismissZombieOverlay();
+                    if (!cameraStarted) setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 200);
+                  } else if (_pollCount >= 3) {
+                    clearInterval(_pollId);
+                    dbg('companion_hello: presence still unconfirmed after ' + _pollCount + ' polls — deferring to presence join', 'warn');
+                  }
+                }, 500);
+              }
+            }
+            // Re-send hello only on the private channel (friendAssigned) to handle the
+            // Python connection race. Do NOT re-send friend_hello on the broker channel
+            // — the SUBSCRIBED handler already sent it, and re-sending creates duplicate
+            // breakout channels.
+            // Also re-send for primary (no friend mode) when camera is already running so
+            // companion can reconnect after a quick restart that didn't trigger a zombie.
+            if (broadcastChannel && (friendAssigned || (!isFriendMode && cameraStarted))) {
+              broadcastChannel.send({
+                type: 'broadcast', event: _helloEventName(),
+                payload: _helloPayload(),
+              }).catch(function () {});
+            }
+            if (myVer && theirVer && myVer !== theirVer) {
+              // Parse x.y.z tuples; treat parse failure as no-reload.
+              var _parseVer = function(s) { var p = s.split('.').map(Number); return p.length === 3 && p.every(isFinite) ? p : null; };
+              var mv = _parseVer(myVer), tv = _parseVer(theirVer);
+              var companionIsNewer = tv && mv && (
+                tv[0] > mv[0] || (tv[0] === mv[0] && tv[1] > mv[1]) ||
+                (tv[0] === mv[0] && tv[1] === mv[1] && tv[2] > mv[2])
+              );
+              if (companionIsNewer) {
+                dbg('companion is newer (' + theirVer + ' > ' + myVer + ') — reloading', 'warn');
+                setStatus('🔄', 'App updated', 'Reloading to get the latest version…');
+                setTimeout(function () { window.location.reload(true); }, 1200);
+              }
+            }
+          })
+          .on('broadcast', { event: 'shutdown' }, function () {
+            dbg('shutdown rx', 'warn');
+            var _shutdownMsg = (friendAssigned || _isFriendReconnect)
+              ? 'The RollShare app has closed. It will reconnect automatically when it restarts.'
+              : 'The RollShare app has closed. Rescan the QR code to reconnect.';
+            _showZombieOverlay('Companion disconnected', _shutdownMsg);
+          })
+          .on('broadcast', { event: 'friend_assign' }, function (payload) {
+            if (!isFriendMode || friendAssigned) return;
+            var bcast = (payload && payload.payload) || payload || {};
+            console.log('[rs-phoneui] friend_assign rx: for=' + (bcast['for'] || '') +
+              ' myId=' + friendEphemeralId + ' status=' + (bcast.status || '') +
+              ' key=' + (bcast.friend_key || '').slice(-8));
+            dbg('friend_assign rx for=' + (bcast['for'] || '').slice(-6) + ' status=' + (bcast.status || '') + ' key=...' + (bcast.friend_key || '').slice(-6));
+            if ((bcast['for'] || '') !== friendEphemeralId) return;
+            if (bcast.status === 'busy') {
+              setStatus('⏳', 'Friend seat busy', 'Host is using a friend slot already');
+              return;
+            }
+            var _fk = bcast.friend_key || '';
+            if (!_fk) return;
+            _switchToFriendPrivateChannel(_fk, bcast.friend_name || 'Friend');
+          })
+          .on('broadcast', { event: 'calib_progress' }, function (payload) {
+            // Host signals calibration done; show the Reset button.
+            if (!friendAssigned) return;
+            var bcast = (payload && payload.payload) || payload || {};
+            var wasDone = _friendCalibDone;
+            _friendCalibDone = !!bcast.done;
+            if (bcast.yolo_only !== undefined) _hostYoloOnly = !!bcast.yolo_only;
+            dbg('calib_progress: done=' + _friendCalibDone + ' yolo_only=' + _hostYoloOnly);
+            _updateCalibBanner();
+            if (_friendCalibDone && !wasDone && !isDev) {
+              try { posthog.capture('friend_calib_complete', { rendezvous_short: activeRendezvousKey.slice(-6) }); } catch(_) {}
+            }
+          })
+          .subscribe(function (status) {
+            dbg('broadcast channel status: ' + status);
+            console.log('[rs-phoneui] channel status=' + status + ' key=...' + activeRendezvousKey.slice(-8) +
+              ' friendMode=' + isFriendMode + ' friendAssigned=' + friendAssigned);
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+              // Supabase WS subscription failed or dropped.  Log clearly and schedule a
+              // reconnect so the phone doesn't silently stall.
+              var _retryDelay = status === 'TIMED_OUT' ? 3000 : 5000;
+              dbg('channel ' + status + ' — will retry in ' + (_retryDelay / 1000) + 's', 'warn');
+              setStatus('\u26a0\ufe0f', 'Connection error', 'Retrying\u2026 (' + status + ')');
+              console.warn('[rs-phoneui] channel ' + status + ' on key=...' + activeRendezvousKey.slice(-8) +
+                ' — retrying in ' + (_retryDelay / 1000) + 's');
+              // Clear any pending friend_hello retry so we don't double-fire on reconnect.
+              if (typeof window._friendHelloRetryId !== 'undefined' && window._friendHelloRetryId !== null) {
+                clearInterval(window._friendHelloRetryId);
+                window._friendHelloRetryId = null;
+              }
+              setTimeout(function () {
+                if (!friendAssigned) {
+                  dbg('retrying channel subscription after ' + status);
+                  initSupabase(true);
+                }
+              }, _retryDelay);
+              return;
+            }
+            if (status === 'SUBSCRIBED') {
+              // Do NOT dismiss zombie unconditionally here — presence sync/join confirm
+              // companion is actually present before dismissing.  Blindly dismissing on
+              // SUBSCRIBED was causing phones to falsely show "reconnected" when companion
+              // was still gone but the phone's own Supabase WS blinked and re-subscribed.
+              // Track phone presence so Companion can also see subscriber count
+              broadcastChannel.track({ user: 'phone' });
+              // Send hello so Companion can confirm bidirectional comms and log device info
+              broadcastChannel.send({
+                type: 'broadcast', event: _helloEventName(),
+                payload: _helloPayload(),
+              }).catch(function () {});
+              // Follow-up: send the real hardware model via User-Agent Client Hints.
+              // Chrome's reduced UA replaces the model with the frozen token 'K'; CH gives
+              // the actual model string (e.g. 'SM-F956B') without requiring a permission.
+              if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+                navigator.userAgentData.getHighEntropyValues(['model']).then(function(hints) {
+                  var _model = (hints && hints.model) ? hints.model.trim() : '';
+                  if (_model && _model !== 'K' && broadcastChannel && _canSendFrames()) {
+                    broadcastChannel.send({
+                      type: 'broadcast', event: 'hello',
+                      payload: { type: 'ua_hints', model: _model },
+                    }).catch(function () {});
+                    dbg('ua_hints model=' + _model);
+                  }
+                }).catch(function () {});
+              }
+              // Friend reconnect tab: auto-start the camera so the user doesn't need to
+              // manually tap Start after a tab reload (mirrors zombie overlay auto-start).
+              // Guard: don't auto-start if zombie is showing — companion may still be gone.
+              if (_isFriendReconnect && !cameraStarted && !document.getElementById('zombie-overlay')) {
+                setStatus('\uD83D\uDD04', 'Reconnecting…', 'Friend session restoring');
+                setTimeout(function () { if (!cameraStarted) startBtn.click(); }, 400);
+              }
+              // Lock-screen/background resume can keep cameraStarted=true while torch is
+              // silently dropped by the OS. Reassert it on channel re-subscribe.
+              setTimeout(function () { _reassertTorchAfterResume('subscribed'); }, 250);
+              // Step 6: Private-channel broker fallback.
+              // If we are on a private channel (reconnect) but Companion is not present
+              // within 15 s of SUBSCRIBED, the channel is dead (Companion listener was
+              // cancelled). Clear the stale localStorage entry and reload on the broker
+              // URL so a fresh friend_assign is issued.
+              // HAPPY PATH: if Companion IS present within 15 s the timer is cancelled
+              // and the fast private-channel path is fully preserved.
+              if (_isFriendReconnect && !isShim) {
+                if (window._brokerFallbackId != null) clearTimeout(window._brokerFallbackId);
+                window._brokerFallbackId = setTimeout(function () {
+                  window._brokerFallbackId = null;
+                  try {
+                    var _fps = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                    var _fcp = Object.values(_fps).some(function(pp) {
+                      return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                    });
+                    // P0-G: log result so it appears in Companion logs
+                    dbg('reconnect 15s check: companion present=' + _fcp
+                      + ' key=...' + activeRendezvousKey.slice(-8), _fcp ? 'info' : 'warn');
+                    if (!_fcp) {
+                      // Dead private channel -- clear stale key and fall back to broker.
+                      try {
+                        for (var _ki = localStorage.length - 1; _ki >= 0; _ki--) {
+                          var _kk = localStorage.key(_ki);
+                          if (_kk && _kk.indexOf(_LS_FRIEND_KEY_PREFIX) === 0) {
+                            if (localStorage.getItem(_kk) === activeRendezvousKey) {
+                              localStorage.removeItem(_kk);
+                              localStorage.removeItem(_kk + '_name');
+                              dbg('broker fallback: cleared stale localStorage ' + _kk, 'warn');
+                            }
+                          }
+                        }
+                      } catch (_) {}
+                      var _brokerKey = rendezvousKey;
+                      if (_brokerKey) {
+                        dbg('broker fallback: reloading on broker URL ...' + _brokerKey.slice(-8), 'warn');
+                        var _bfp = new URLSearchParams();
+                        _bfp.set('s', _brokerKey);
+                        _bfp.set('friend', '1');
+                        window.location.href = window.location.pathname + '?' + _bfp.toString();
+                      }
+                    }
+                  } catch (_) {}
+                }, 15000);
+              }
+              // ── Periodic presence watchdog ─────────────────────────────────────────
+              // Poll every 4 s.  If companion is absent and camera is running, the WS
+              // likely dropped silently without firing a leave/sync event (hard kill,
+              // crash, or quick restart that outran presence propagation).
+              // Skipped in shim/relay mode — relay doesn't support Supabase Presence so
+              // presenceState() always returns {} and would false-fire immediately.
+              if (typeof window._presenceWatchdogId === 'undefined') window._presenceWatchdogId = null;
+              if (window._presenceWatchdogId !== null) clearInterval(window._presenceWatchdogId);
+              if (!isShim) {
+                window._presenceWatchdogId = setInterval(function () {
+                  if (document.getElementById('zombie-overlay')) return; // already showing
+                  if (!cameraStarted) return; // no active session to watch
+                  if (!_companionEverPresent) return; // never connected — don't false-fire
+                  try {
+                    var _wps = broadcastChannel && broadcastChannel.presenceState ? broadcastChannel.presenceState() : {};
+                    var _wcp = Object.values(_wps).some(function(pp) {
+                      return Array.isArray(pp) && pp.some(function(p) { return p.user === 'companion'; });
+                    });
+                    if (!_wcp) {
+                      dbg('watchdog: companion absent — showing zombie', 'warn');
+                      _showZombieOverlay('Companion disconnected', 'The RollShare app has closed. Attempting to automatically re-connect...');
+                    }
+                  } catch (_) {}
+                }, 4000);
+              }
+              // Friend mode: update status to reflect which channel phase we're in, and
+              // flush cam_label + geo that were blocked while on the broker channel.
+              if (isFriendMode) {
+                if (!friendAssigned) {
+                  setStatus('\uD83D\uDD17', 'Friend Broker', 'Waiting for companion to assign your private channel\u2026');
+                  // 30 s cumulative self-heal: if no friend_assign arrives within 30 s of
+                  // first SUBSCRIBED on the broker channel, clear localStorage private keys
+                  // and hard-reload on the broker URL for a clean slate.  The deadline is
+                  // measured from the FIRST SUBSCRIBED (not reset per initSupabase retry)
+                  // so repeated channel reconnects don't extend the window.
+                  if (!window._brokerSubscribedAt) window._brokerSubscribedAt = Date.now();
+                  if (window._brokerSelfHealId != null) clearTimeout(window._brokerSelfHealId);
+                  var _doSelfHeal = function () {
+                    if (friendAssigned || !isFriendMode) return;
+                    dbg('broker: 30s deadline — clearing LS and reloading on broker URL', 'warn');
+                    console.warn('[rs-phoneui] broker 30s self-heal key=...' + rendezvousKey.slice(-8));
+                    try {
+                      for (var _bi = localStorage.length - 1; _bi >= 0; _bi--) {
+                        var _bk = localStorage.key(_bi);
+                        if (_bk && _bk.indexOf(_LS_FRIEND_KEY_PREFIX) === 0) {
+                          localStorage.removeItem(_bk);
+                          dbg('broker self-heal: cleared ' + _bk, 'warn');
+                        }
+                      }
+                    } catch (_) {}
+                    var _bhp = new URLSearchParams();
+                    _bhp.set('s', rendezvousKey); _bhp.set('friend', '1');
+                    window.location.href = window.location.pathname + '?' + _bhp.toString();
+                  };
+                  var _brokerDeadlineMs = 30000 - (Date.now() - window._brokerSubscribedAt);
+                  if (_brokerDeadlineMs <= 0) {
+                    _doSelfHeal();
+                  } else {
+                    window._brokerSelfHealId = setTimeout(function () {
+                      window._brokerSelfHealId = null;
+                      _doSelfHeal();
+                    }, _brokerDeadlineMs);
+                  }
+                  // Retry friend_hello every 5 s in case Companion's broker channel wasn't
+                  // connected yet when we first sent it (race on slower/cold networks).
+                  if (typeof window._friendHelloRetryId === 'undefined') window._friendHelloRetryId = null;
+                  if (window._friendHelloRetryId !== null) clearInterval(window._friendHelloRetryId);
+                  var _friendHelloAttempt = 0;
+                  window._friendHelloRetryId = setInterval(function () {
+                    if (friendAssigned || !isFriendMode) {
+                      clearInterval(window._friendHelloRetryId);
+                      window._friendHelloRetryId = null;
+                      return;
+                    }
+                    _friendHelloAttempt++;
+                    setStatus('\uD83D\uDD17', 'Friend Broker (attempt ' + (_friendHelloAttempt + 1) + '\u2026)', 'Waiting for companion to assign your private channel');
+                    dbg('friend_hello retry #' + _friendHelloAttempt + ' (no friend_assign yet)', 'warn');
+                    console.log('[rs-phoneui] friend_hello retry #' + _friendHelloAttempt +
+                      ' key=...' + activeRendezvousKey.slice(-8));
+                    if (broadcastChannel) {
+                      broadcastChannel.send({
+                        type: 'broadcast', event: 'friend_hello',
+                        payload: _helloPayload(),
+                      }).catch(function () {});
+                    }
+                    // After 4 retries (~20 s total) force a full channel reconnect.
+                    if (_friendHelloAttempt >= 4) {
+                      clearInterval(window._friendHelloRetryId);
+                      window._friendHelloRetryId = null;
+                      dbg('friend_hello: no response after 4 retries \u2014 reconnecting channel', 'warn');
+                      console.warn('[rs-phoneui] friend_hello: no response after 4 retries \u2014 reconnecting channel');
+                      initSupabase(true);
+                    }
+                  }, 5000);
+                } else {
+                  // Assigned — cancel self-heal timer and reset the cumulative clock.
+                  if (window._brokerSelfHealId != null) { clearTimeout(window._brokerSelfHealId); window._brokerSelfHealId = null; }
+                  window._brokerSubscribedAt = null;
+                  // Now on private channel — send pending metadata that was held back
+                  if (cameraStarted) _sendCamLabel();
+                  if (_cachedGeoLat !== null) {
+                    broadcastChannel.send({
+                      type: 'broadcast', event: 'hello',
+                      payload: { type: 'geo', lat: _cachedGeoLat, lon: _cachedGeoLon },
+                    }).catch(function() {});
+                  }
+                }
+              }
+            }
+          });
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function _releaseCamera() {
+    if (!cameraStarted) return;
+    cameraStarted = false;
+    startBtn.textContent = 'Start Camera';
+    startBtn.disabled = false;
+    // Note: startBtn.style.display stays hidden — click() works on hidden buttons.
+    // We restore it only in error paths so the user can manually retry.
+    if (frameTimerId !== null) { clearInterval(frameTimerId); frameTimerId = null; }
+    if (torchEnabled) {
+      torchEnabled = false;
+      torchBtn.textContent = '\uD83D\uDD26';
+      torchBtn.style.display = 'none';
+    }
+    if (currentStream) {
+      currentStream.getTracks().forEach(function(t) { t.stop(); });
+      currentStream = null;
+      videoTrack = null;
+    }
+    video.srcObject = null;
+    dbg('camera released — companion disconnected', 'warn');
+  }
+
+  var _zombieTimerId = null;
+
+  function _showZombieOverlay(title, msg) {
+    if (document.getElementById('zombie-overlay')) return;
+    _releaseCamera();
+    var d = document.createElement('div');
+    d.id = 'zombie-overlay';
+    d.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,26,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.7rem;z-index:999;color:#f5b7b1;text-align:center;padding:1.5rem;';
+    var _modeLabel = isFriendMode
+      ? (friendAssigned ? 'Friend (private channel)' : 'Friend (broker)')
+      : (_isFriendReconnect ? 'Friend (reconnect)' : 'Primary');
+    var _keyLabel = activeRendezvousKey ? activeRendezvousKey.slice(-8) : '?';
+    d.innerHTML = '<div style="font-size:2.5rem">\u26a0\ufe0f</div>'
+      + '<div style="font-weight:700;font-size:1.1rem">' + title + '</div>'
+      + '<div style="font-size:0.88rem;color:#ccc">' + msg + '</div>'
+      + '<div style="font-size:0.75rem;color:#777;margin-top:0.15rem">mode: ' + _modeLabel + ' &nbsp;&bull;&nbsp; key: \u2026' + _keyLabel + '</div>'
+      + '<div id="zombie-countdown" style="font-size:0.8rem;color:#888;margin-top:0.5rem">Trying to reconnect\u2026 10:00</div>';
+    document.body.appendChild(d);
+    var remaining = 600;
+    function _tick() {
+      remaining--;
+      var el = document.getElementById('zombie-countdown');
+      if (!el) return;
+      if (remaining <= 0) {
+        el.textContent = 'No reconnection \u2014 please rescan the QR code.';
+        el.style.color = '#f5b7b1';
+        return;
+      }
+      var m = Math.floor(remaining / 60);
+      var s = remaining % 60;
+      el.textContent = 'Trying to reconnect\u2026 ' + m + ':' + (s < 10 ? '0' : '') + s;
+      _zombieTimerId = setTimeout(_tick, 1000);
+    }
+    _zombieTimerId = setTimeout(_tick, 1000);
+    // In friend-reconnect mode the private key may be stale (Companion moved to a
+    // new slot key).  After the countdown expires, clear the stale localStorage entry
+    // so the next QR scan goes through the broker and gets a fresh valid key.
+    if (_isFriendReconnect) {
+      var _staleCheckId = setTimeout(function () {
+        if (!document.getElementById('zombie-overlay')) return;
+        // Clear the stale private-key mapping so future broker URL visits reconnect fresh.
+        try {
+          // Walk all localStorage keys for this origin and remove any rs_friend_pk_* entry
+          // whose stored value matches our current (stale) activeRendezvousKey.
+          for (var _i = localStorage.length - 1; _i >= 0; _i--) {
+            var _k = localStorage.key(_i);
+            if (_k && _k.indexOf(_LS_FRIEND_KEY_PREFIX) === 0) {
+              if (localStorage.getItem(_k) === activeRendezvousKey) {
+                localStorage.removeItem(_k);
+                localStorage.removeItem(_k + '_name');
+                dbg('cleared stale localStorage entry: ' + _k, 'warn');
+              }
+            }
+          }
+        } catch (_) {}
+        var _cdEl2 = document.getElementById('zombie-countdown');
+        if (_cdEl2) {
+          _cdEl2.textContent = 'Friend session expired \u2014 please rescan the Friends QR code from the RollShare app.';
+          _cdEl2.style.color = '#f5b7b1';
+        }
+      }, 180000); // 3 minutes — timer self-guards with zombie-overlay existence check
+    }
+  }
+
+  function _dismissZombieOverlay() {
+    if (_zombieTimerId !== null) { clearTimeout(_zombieTimerId); _zombieTimerId = null; }
+    var el = document.getElementById('zombie-overlay');
+    if (el) el.remove();
+  }
+
+  // ── Canvases ──────────────────────────────────────────────────────────────
+  function ensureCanvases() {
+    if (!sfCanvas)  { sfCanvas  = document.createElement('canvas'); sfCanvas.width  = 160; sfCanvas.height = 120; }
+    if (!capCanvas) { capCanvas = document.createElement('canvas'); capCanvas.width = 320; capCanvas.height = 240; }
+  }
+  /**
+   * Draw video into ctx matching the visible preview: page wrapper rotate(180°) +
+   * video element rotate(180°) cancel each other for display, and object-position:50% 0
+   * anchors the cover-crop to the TOP of the raw frame.
+   *
+   * The raw frame top = the dice tray (phone held face-down overhead).
+   * We sample sy=0 (top of raw frame) and rotate the canvas output 180° so the
+   * detector receives a right-side-up image (same orientation as the visible preview).
+   */
+  function drawCoverTop(ctx, vid, dw, dh) {
+    var vw = vid.videoWidth, vh = vid.videoHeight;
+    if (!vw || !vh) return;
+    var scale = Math.max(dw / vw, dh / vh);
+    var sw = Math.round(dw / scale);
+    var sh = Math.round(dh / scale);
+    var sx = Math.round((vw - sw) / 2);  // center horizontally
+    var sy = 0;                           // top of raw frame = dice tray (matches object-position:50% 0)
+    // Rotate 180° so the output is right-side-up (matches the visible preview orientation)
+    ctx.save();
+    ctx.translate(dw, dh);
+    ctx.rotate(Math.PI);
+    ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, dw, dh);
+    ctx.restore();
+  }
+  // ── Frame loop (12 fps) ───────────────────────────────────────────────────
+  function processFrame() {
+    if (video.readyState < 2) return;
+    frameSeq++;
+    var sfCtx = sfCanvas.getContext('2d', { willReadFrequently: true });
+    drawCoverTop(sfCtx, video, 160, 120);
+    // Skip diff detection + frame analysis while camera AE is settling (1 s after open/switch).
+    if (Date.now() < _camSettleUntil) return;
+    // On first settled frame after (re)start, send a display-only preview so the companion
+    // pip is populated with a clean (non-blown-out) frame.
+    if (_sendFrameOnStart && broadcastChannel) {
+      _sendFrameOnStart = false;
+      sendDisplayFrame(frameSeq);
+    }
+    var imgData = sfCtx.getImageData(0, 0, 160, 120);
+    var gray = new Uint8Array(160 * 120);
+    for (var i = 0; i < gray.length; i++) {
+      var p = i * 4;
+      gray[i] = (0.299 * imgData.data[p] + 0.587 * imgData.data[p+1] + 0.114 * imgData.data[p+2]) | 0;
+    }
+    var r = motionDetector.update(gray);
+    if (r.inMotion) {
+      lastMotionFrame = frameSeq; settleFired = false;
+      motionDot.classList.add('active');
+      setStatus('🎲', 'Movement detected…', 'Keep rolling!');
+      // Send a display-only preview frame on the first above-threshold motion frame
+      // of each throw — pure eye candy, Python will not run analysis on it.
+      if (!_grabPreviewSent && r.diff_mean > GRAB_THRESHOLD && !uploading) {
+        _grabPreviewSent = true;
+        sendDisplayFrame(frameSeq);
+      }
+    } else {
+      motionDot.classList.remove('active');
+      var quiet = frameSeq - lastMotionFrame;
+      if (!settleFired && quiet >= JUST_SETTLED_DELAY_FRAMES) {
+        settleFired = true;
+        _grabPreviewSent = false;  // reset so next throw can send a preview again
+        var peak = motionDetector.peakBeforeSettle(JUST_SETTLED_DELAY_FRAMES, GRAB_SPIKE_WINDOW);
+        motionDetector.markSettle(peak);
+        if (peak > GRAB_THRESHOLD && !uploading) { uploadSettledFrame(peak, frameSeq); }
+        else if (!uploading) { setStatus('👀', 'Watching for roll...', 'Point camera at the dice tray'); }
+      }
+    }
+    if (debugMode) {
+      drawMotionGraph();
+      var _cpvSf = document.getElementById('cpv-sf');
+      if (_cpvSf) _cpvSf.getContext('2d').drawImage(sfCanvas, 0, 0);
+    }
+  }
+
+  // ── Motion graph (debug mode) ────────────────────────────────
+  var _graphLifetimePeak = 0;
+  function drawMotionGraph() {
+    var canvas = document.getElementById('motion-graph');
+    if (!canvas) return;
+    var dm   = motionDetector.history;
+    var thr  = motionDetector.threshHist;
+    var sett = motionDetector.settleHist;
+    var n = dm.length;
+    if (n < 2) return;
+
+    var cssW = canvas.offsetWidth || 440;
+    if (canvas.width !== cssW) canvas.width = cssW;
+    var W = canvas.width, H = canvas.height;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    var last = dm[n - 1], lastThr = thr[n - 1];
+    if (last > _graphLifetimePeak) _graphLifetimePeak = last;
+    var MAX_VAL = Math.max(GRAB_THRESHOLD * 2, _graphLifetimePeak * 1.15, 20);
+    var step = W / Math.max(n - 1, 1);
+    function toY(v) { return H - Math.min(Math.max(v, 0) / MAX_VAL, 1.0) * (H - 2) - 1; }
+
+    // GRAB_THRESHOLD reference line (red dashed)
+    ctx.strokeStyle = 'rgba(255,80,80,0.55)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(0, toY(GRAB_THRESHOLD)); ctx.lineTo(W, toY(GRAB_THRESHOLD)); ctx.stroke();
+
+    // Adaptive threshold (yellow dashed)
+    ctx.strokeStyle = 'rgba(230,200,74,0.65)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+      var xi = i * step;
+      if (i === 0) ctx.moveTo(xi, toY(thr[i])); else ctx.lineTo(xi, toY(thr[i]));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Settle events: green = triggered upload, orange = below grab threshold
+    ctx.lineWidth = 1.5;
+    for (var i = 0; i < sett.length; i++) {
+      var sv = sett[i];
+      if (sv === null || sv === undefined) continue;
+      var xs = Math.round(i * step) + 0.5;
+      ctx.strokeStyle = sv > GRAB_THRESHOLD ? 'rgba(74,222,128,0.9)' : 'rgba(255,160,60,0.75)';
+      ctx.beginPath(); ctx.moveTo(xs, H); ctx.lineTo(xs, toY(sv)); ctx.stroke();
+    }
+
+    // diff_mean line (bright green)
+    ctx.strokeStyle = '#4ade80';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+      var xd = i * step;
+      if (i === 0) ctx.moveTo(xd, toY(dm[i])); else ctx.lineTo(xd, toY(dm[i]));
+    }
+    ctx.stroke();
+
+    document.getElementById('motion-graph-cur').textContent    = 'diff ' + last.toFixed(2);
+    document.getElementById('motion-graph-peak').textContent   = 'peak ' + _graphLifetimePeak.toFixed(1);
+    document.getElementById('motion-graph-thresh').textContent = 'thr ' + lastThr.toFixed(2) + '  grab>' + GRAB_THRESHOLD;
+  }
+
+  // ── Debug log panel ────────────────────────────────────────────────────────
+  var dbgPanel = document.getElementById('dbg-panel');
+  var debugMode = /[?&]debug=1/.test(window.location.search);
+  if (debugMode) {
+    if (dbgPanel) dbgPanel.classList.add('visible');
+    // In debug=1 mode (without dev=1) keep the devmode panel CLOSED by default so
+    // it doesn't cover the Start Camera button on phones.  The ⚙ toggle button is
+    // shown so the user can manually open it after the camera is running.
+    // (When dev=1 is also set the devmode IIFE opens the panel itself as usual.)
+    var _devBtn = document.getElementById('devmode-toggle-btn');
+    if (_devBtn) {
+      _devBtn.style.display = 'flex';
+      // Wire up toggle only when the devmode IIFE hasn't already done it (no ?dev=1).
+      if (!_devBtn.onclick) {
+        _devBtn.onclick = function () {
+          var _p = document.getElementById('devmode-panel');
+          if (_p) {
+            // dev=1 mode: full devmode panel
+            _p.classList.toggle('open');
+            var _h = _p.classList.contains('open') ? _p.offsetHeight : 0;
+            document.documentElement.style.setProperty('--devpanel-h', _h + 'px');
+          } else if (dbgPanel) {
+            // debug=1 only (production): toggle the log panel directly
+            dbgPanel.classList.toggle('visible');
+          }
+        };
+      }
+    }
+  }
+  // Log version immediately so it appears at the top of the debug panel
+  // (broadcastChannel not yet open here, so console-only)
+  console.log('[cloud] phoneui-cloud v' + APP_VERSION + ' (' + GIT_COMMIT + ') built ' + BUILD_TIME);
+  if (debugMode) {
+    var _badge = document.getElementById('ver-badge');
+    if (_badge) { _badge.textContent = GIT_COMMIT; _badge.style.display = 'inline'; }
+    if (dbgPanel) {
+      var _verEl = document.createElement('div');
+      _verEl.style.color = '#86efac';
+      _verEl.textContent = 'phoneui-cloud v' + APP_VERSION + '  ' + BUILD_TIME;
+      dbgPanel.appendChild(_verEl);
+    }
+  }
+  var _remoteLogSeq = 0;
+  function dbg(msg, level) {
+    var ts = new Date().toISOString().slice(11, 23);
+    var line = ts + ' ' + msg;
+    var cls = level === 'error' ? 'dbg-err' : level === 'warn' ? 'dbg-warn' : '';
+    console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log']('[cloud] ' + msg);
+    if (debugMode) {
+      var el = document.createElement('div');
+      if (cls) el.className = cls;
+      el.textContent = line;
+      dbgPanel.appendChild(el);
+      // keep scrolled to bottom, cap at 200 entries
+      if (dbgPanel.children.length > 200) dbgPanel.removeChild(dbgPanel.firstChild);
+      dbgPanel.scrollTop = dbgPanel.scrollHeight;
+    }
+    // Forward errors, warns, and (in debugMode) all messages to Companion via broadcast
+    if (broadcastChannel && (level === 'error' || level === 'warn' || debugMode)) {
+      _remoteLogSeq++;
+      broadcastChannel.send({
+        type: 'broadcast', event: 'log',
+        payload: { type: 'log', level: level || 'info', msg: msg, seq: _remoteLogSeq },
+      }).catch(function () {});
+    }
+  }
+
+  // ── Display-only preview (grab moment eye candy) ────────────────────────────
+  // Fires on the first above-threshold motion frame of a throw. Sends the current
+  // sfCanvas (160×120 JPEG) via Broadcast with display_only:true so Python shows
+  // it in the companion pip but does NOT run dice analysis.
+  function sendDisplayFrame(seq) {
+    if (!broadcastChannel || !_canSendFrames()) return;
+    try {
+      var b64 = sfCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      broadcastChannel.send({
+        type: 'broadcast',
+        event: 'frame',
+        payload: { type: 'frame', image_b64: b64, display_only: true, frame_seq: seq, battery_level: _batteryLevel },
+      });
+      dbg('display-only preview sent seq=' + seq);
+    } catch (e) {
+      dbg('display-only send failed: ' + e, 'warn');
+    }
+  }
+
+  // ── Upload on settle ──────────────────────────────────────────────────────
+  async function uploadSettledFrame(peakBeforeSettle, seq) {
+    if (!supabase) return;
+    if (!_canSendFrames()) {
+      setStatus('⏳', 'Waiting for private lane…', 'Host is assigning your friend channel');
+      return;
+    }
+    uploading = true;
+    setStatus('☁️', 'Settled — sending…', 'Sending frame to RollShare');
+    uploadWrap.style.display = ''; uploadBar.style.width = '30%';
+    dbg('uploadSettledFrame seq=' + seq + ' peak=' + peakBeforeSettle.toFixed(1) + ' inline=' + USE_BROADCAST_INLINE);
+    try {
+      var capCtx = capCanvas.getContext('2d');
+      drawCoverTop(capCtx, video, 320, 240);
+      dbg('drawCoverTop done');
+      if (debugMode) {
+        var _cpvCap = document.getElementById('cpv-cap');
+        if (_cpvCap) _cpvCap.getContext('2d').drawImage(capCanvas, 0, 0);
+      }
+
+      if (USE_BROADCAST_INLINE) {
+        // ── Inline path: embed PNG base64 directly in the Broadcast payload ──
+        // No Storage upload/download; eliminates ~400-1200ms of mobile-upload latency.
+        var blob = await new Promise(function(res) { capCanvas.toBlob(res, 'image/png'); });
+        if (!blob) throw new Error('toBlob returned null');
+        dbg('inline blob size=' + blob.size);
+        if (blob.size > 200 * 1024) {
+          dbg('inline blob exceeds 200KB (' + blob.size + '), falling back to storage path', 'warn');
+          // Fall through to storage path below by re-running as storage mode.
+          uploading = false;
+          uploadWrap.style.display = 'none';
+          var _savedFlag = USE_BROADCAST_INLINE;
+          USE_BROADCAST_INLINE = false;
+          await uploadSettledFrame(peakBeforeSettle, seq);
+          USE_BROADCAST_INLINE = _savedFlag;
+          return;
+        }
+        var reader = new FileReader();
+        var b64 = await new Promise(function(res, rej) {
+          reader.onload = function() { res(reader.result.split(',')[1]); };
+          reader.onerror = rej;
+          reader.readAsDataURL(blob);
+        });
+        uploadBar.style.width = '70%';
+        var _inlinePayload = { type: 'frame', image_b64: b64, peak_before_settle: peakBeforeSettle, frame_seq: seq, battery_level: _batteryLevel };
+        var bcResult = await broadcastChannel.send({
+          type: 'broadcast',
+          event: 'frame',
+          payload: _inlinePayload,
+        });
+        dbg('inline broadcast result=' + JSON.stringify(bcResult));
+        uploadBar.style.width = '100%';
+        setStatus('✅', 'Sent to RollShare ✓', 'Watching for next roll…');
+        if (!isDev) { try { posthog.capture('cloud_frame_uploaded', { rendezvous_short: activeRendezvousKey.slice(-6), inline: true }); } catch(_) {} }
+        setTimeout(function () { uploadBar.style.width = '0%'; uploadWrap.style.display = 'none'; }, 600);
+
+      } else {
+        // ── Storage path (original): upload PNG, broadcast storage_path ────
+        if (!anonSignedIn) {
+          dbg('upload skipped — anonymous sign-in not yet complete', 'warn');
+          setStatus('⏳', 'Waiting for auth…', 'Anonymous sign-in pending, will retry next settle');
+          uploading = false; uploadWrap.style.display = 'none'; return;
+        }
+        var blob2 = await new Promise(function(res) { capCanvas.toBlob(res, 'image/png'); });
+        if (!blob2) throw new Error('toBlob returned null');
+        dbg('storage blob size=' + blob2.size);
+        var buf  = await blob2.arrayBuffer();
+        var path = activeRendezvousKey + '/' + String(seq).padStart(6, '0') + '.png';
+        uploadBar.style.width = '55%';
+        dbg('uploading to storage path=' + path);
+        var up = await supabase.storage.from('settled-frames').upload(path, buf, { contentType: 'image/png', upsert: true });
+        if (up.error) {
+          var errDetail = up.error.message || up.error.error || JSON.stringify(up.error);
+          dbg('upload error: ' + errDetail + ' | status=' + (up.error.statusCode || up.error.status || '?') + ' | full=' + JSON.stringify(up.error), 'error');
+          setStatus('\u26a0\ufe0f', 'Upload failed', errDetail);
+          console.error('storage upload error:', up.error);
+          uploadWrap.style.display = 'none'; uploading = false; return;
+        }
+        dbg('upload ok, sending broadcast frame event');
+        uploadBar.style.width = '80%';
+        var _storagePayload = { type: 'frame', storage_path: path, peak_before_settle: peakBeforeSettle, frame_seq: seq, battery_level: _batteryLevel };
+        var bcResult2 = await broadcastChannel.send({
+          type: 'broadcast',
+          event: 'frame',
+          payload: _storagePayload,
+        });
+        dbg('storage broadcast result=' + JSON.stringify(bcResult2));
+        uploadBar.style.width = '100%';
+        setStatus('✅', 'Sent to RollShare ✓', 'Watching for next roll…');
+        if (!isDev) { try { posthog.capture('cloud_frame_uploaded', { rendezvous_short: activeRendezvousKey.slice(-6) }); } catch(_) {} }
+        setTimeout(function () { uploadBar.style.width = '0%'; uploadWrap.style.display = 'none'; }, 600);
+      }
+    } catch (err) {
+      dbg('upload exception: ' + String(err), 'error');
+      setStatus('⚠️', 'Send error', String(err)); uploadWrap.style.display = 'none';
+    }
+    uploading = false;
+  }
+
+  // ── Start button ──────────────────────────────────────────────────────────
+  startBtn.addEventListener('click', async function () {
+    if (cameraStarted) return;
+    startBtn.disabled = true; startBtn.textContent = 'Starting…';
+    setStatus('⏳', 'Starting…', '');
+
+    // Request geolocation now — inside a user gesture so browsers allow the permission prompt.
+    // Fire-and-forget: send a geo broadcast whenever the position arrives (or silently skip if denied).
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          _cachedGeoLat = pos.coords.latitude;
+          _cachedGeoLon = pos.coords.longitude;
+          if (broadcastChannel && _canSendFrames()) {
+            broadcastChannel.send({
+              type: 'broadcast', event: 'hello',
+              payload: { type: 'geo', lat: _cachedGeoLat, lon: _cachedGeoLon },
+            }).catch(function() {});
+          }
+        },
+        function() { /* denied or unavailable — skip silently */ },
+        { timeout: 10000, maximumAge: 300000 }
+      );
+    }
+
+    if (!initSupabase()) {
+      showError('Supabase unavailable', 'Could not load the Supabase library. Check your internet connection and reload.');
+      startBtn.disabled = false; startBtn.textContent = 'Start Camera'; return;
+    }
+
+    var chosenId = cameraSelect.value || null;
+    // Only open camera if the preview-on-load path hasn't already opened it.
+    // If the user picked a different device, re-open with that device.
+    if (!currentStream) {
+      setStatus('⏳', 'Requesting camera…', 'Allow camera access when prompted');
+      try { await openCamera(chosenId); }
+      catch (err) {
+        showError('Camera access denied', 'Please allow camera access and try again. ' + (err.message || err));
+        startBtn.disabled = false; startBtn.textContent = 'Start Camera';
+        setStatus('📷', 'Camera not available', 'Grant camera permission above'); return;
+      }
+    } else if (chosenId && chosenId !== currentDeviceId) {
+      try { await openCamera(chosenId); } catch (_) {}
+    }
+
+    // Enumerate cameras now that we have permission to see labels
+    try {
+      // Re-enumerate: browsers reveal real labels + deviceIds after first getUserMedia
+      var fresh = await navigator.mediaDevices.enumerateDevices();
+      var fvids  = fresh.filter(function(d) { return d.kind === 'videoinput'; });
+      // iOS preference: pick rear, non-Wide camera as default
+      if (IS_IOS && !chosenId) {
+        var pref = RsCameraSelector.getPreferredIosCamera(fvids);
+        if (pref && pref.deviceId) { chosenId = pref.deviceId; try { await openCamera(chosenId); } catch(_) {} }
+      }
+      var activeId = RsCameraSelector.deviceIdFromTrack(videoTrack) || chosenId || '';
+      // Populate cameras immediately so the list appears right away (no torch info yet).
+      await populateCameras(activeId, fvids, new Set());
+      // Probe torch capabilities (slow multi-camera scan on Android), then re-populate.
+      torchIds = await RsCameraSelector.probeTorchIds(fvids, IS_IOS, videoTrack);
+      // Supplement probe result with the warm active track — cold probe streams often
+      // fail to report 'torch' in getCapabilities() on Android even when it's supported.
+      if (activeId && RsCameraSelector.hasTorchCapability(videoTrack)) {
+        torchIds.add(activeId);
+      }
+      // Restore the last-used camera from localStorage (if the user didn't already pick one).
+      // Match by deviceId first, then fall back to label (ids can change across page loads).
+      if (!chosenId) {
+        try {
+          var _lsId    = localStorage.getItem('rs_last_cam_id') || '';
+          var _lsLabel = localStorage.getItem('rs_last_cam_label') || '';
+          var _savedCam = null;
+          if (_lsId)    _savedCam = fvids.find(function(d) { return d.deviceId === _lsId; }) || null;
+          if (!_savedCam && _lsLabel)
+            _savedCam = fvids.find(function(d) { return (d.label || '').replace(/\s*🔦$/, '').trim() === _lsLabel; }) || null;
+          if (_savedCam && _savedCam.deviceId !== activeId) {
+            dbg('restoring saved camera: ' + _lsLabel + ' (' + _savedCam.deviceId.slice(-6) + ')');
+            try { await openCamera(_savedCam.deviceId); activeId = _savedCam.deviceId; } catch(_) {}
+          }
+        } catch (_) {}
+      }
+      // If the active camera has no torch, switch to the first rear camera that does.
+      if (torchIds.size && !torchIds.has(activeId)) {
+        var preferTorch = fvids.find(function(d) {
+          if (!torchIds.has(d.deviceId)) return false;
+          var lbl = (d.label || '').toLowerCase();
+          return lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment');
+        });
+        if (preferTorch) {
+          try { await openCamera(preferTorch.deviceId); activeId = preferTorch.deviceId; } catch(_) {}
+        }
+      }
+      // Always re-populate with final torch info (even if torchIds is empty).
+      await populateCameras(activeId, fvids, torchIds);
+      _sendCamLabel();  // report active camera label to Companion (also saves to localStorage)
+    } catch (e) { console.warn('camera enumeration failed:', e); }
+
+    ensureCanvases();
+    motionDetector.reset();
+    cameraStarted = true;
+    updateNoTorchBanner();
+    // Keep status-bar visible in-flow; just hide the controls.
+    startBtn.style.display = 'none';
+    setStatus('\uD83D\uDC41', 'Watching for motion\u2026', 'Point camera at the dice tray');
+    frameTimerId = setInterval(processFrame, Math.round(1000 / 12));
+    _sendFrameOnStart = true;  // request one display-only frame on the next tick
+    _sendHello('camera_started');
+    // Show calibration banner for friend sessions (after camera starts so layout is stable)
+    if (isFriendMode || _isFriendReconnect) _updateCalibBanner();
+
+    if (!isDev) { try { posthog.capture('cloud_session_started', { rendezvous_short: activeRendezvousKey.slice(-6), friend_mode: isFriendMode }); } catch(_) {} }
+  });
+
+  // ── Open camera preview on page load ────────────────────────────────────
+  // Show the live camera feed immediately (like phoneui-direct) so the user
+  // can frame their shot before pressing Start.  The motion-detection loop
+  // only begins on button press.
+  // On iOS Safari getUserMedia needs a real touch gesture; if the attempt
+  // fails with NotAllowedError we show the tap overlay — but the tap only
+  // opens the preview, not the full stream.
+  // Pass ?noautostart=1 to suppress entirely (used by automated tests).
+
+  // Stamp version into status bar and show git hash badge in debug mode
+  (function() {
+    var v = document.getElementById('status-version');
+    if (v && APP_VERSION && APP_VERSION !== '1.1.8') {
+      v.textContent = 'v' + APP_VERSION;
+    }
+    if (debugMode && GIT_COMMIT && GIT_COMMIT !== '305e51a') {
+      // Primary mode: badge next to h1 title
+      var _badge = document.getElementById('ver-badge');
+      if (_badge) { _badge.textContent = GIT_COMMIT; _badge.style.display = 'inline'; }
+      // Friend mode: badge inside friend-mode-sub chip
+      var _badgeFriend = document.getElementById('ver-badge-friend');
+      if (_badgeFriend) { _badgeFriend.textContent = GIT_COMMIT; _badgeFriend.style.display = 'inline'; }
+    }
+  })();
+
+  var _tapOverlay = document.getElementById('tap-overlay');
+  if (_tapOverlay) {
+    _tapOverlay.addEventListener('click', async function() {
+      _tapOverlay.classList.remove('show');
+      // On iOS this click is a real gesture — open preview only
+      if (!currentStream) {
+        try { await openCamera(null); } catch(_) {}
+      }
+    });
+  }
+
+  if (params.get('noautostart')) {
+    startBtn.style.display = '';  // show for manual start
+  } else {
+    var _previewAttempted = false;
+    async function _tryOpenPreview() {
+      if (_previewAttempted || currentStream || cameraStarted) return;
+      _previewAttempted = true;
+      try {
+        await openCamera(null);
+        // Preview live — auto-start motion loop (button stays hidden).
+        startBtn.click();
+      } catch(err) {
+        if (err.name === 'NotAllowedError') {
+          // iOS Safari: needs a real gesture before getUserMedia
+          if (_tapOverlay) _tapOverlay.classList.add('show');
+        } else {
+          // Other errors: surface the button so user can retry manually
+          startBtn.style.display = '';
+        }
+      }
+    }
+    setTimeout(_tryOpenPreview, 400);
+  }
+
+  // ── Info overlay ──────────────────────────────────────────────────────────
+  (function () {
+    var overlay = document.getElementById('info-overlay');
+    document.getElementById('info-btn').addEventListener('click', function () {
+      overlay.classList.add('open');
+    });
+    document.getElementById('info-dismiss-btn').addEventListener('click', function () {
+      overlay.classList.remove('open');
+    });
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) overlay.classList.remove('open');
+    });
+  })();
+
+  // ── Tab/window close: notify Companion ───────────────────────────────────
+  // pagehide fires reliably on iOS Safari (tab swipe-away, navigation).
+  // visibilitychange→hidden fires on Android Chrome when a tab is closed, but
+  // also fires on app-switch and screen-off — send bye only after a short delay
+  // and cancel if the page becomes visible again (app-switch / screen-back-on).
+  // Untracking presence on visibilitychange is always safe: Supabase re-tracks
+  // when the phone re-subscribes, and it avoids presence leaks on Android kills.
+  var _byeDelayId = null;
+  function _sendByeAndUntrack() {
+    dbg('pagehide: sending bye', 'warn');
+    if (broadcastChannel) {
+      try {
+        broadcastChannel.send({
+          type: 'broadcast', event: 'bye',
+          payload: { type: 'bye' },
+        });
+      } catch (_) {}
+      try { broadcastChannel.untrack(); } catch (_) {}
+    }
+  }
+  window.addEventListener('pagehide', function () {
+    if (_byeDelayId !== null) { clearTimeout(_byeDelayId); _byeDelayId = null; }
+    _sendByeAndUntrack();
+  }, { capture: true });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') {
+      // Untrack immediately (cheap, self-corrects on re-visible).
+      if (broadcastChannel) { try { broadcastChannel.untrack(); } catch (_) {} }
+      // Delay the bye broadcast — if the page comes back visible within 3s
+      // (app-switch, screen-on) we cancel it to avoid a false disconnect.
+      if (_byeDelayId !== null) clearTimeout(_byeDelayId);
+      _byeDelayId = setTimeout(function () {
+        _byeDelayId = null;
+        if (document.visibilityState === 'hidden') {
+          if (broadcastChannel) {
+            try { broadcastChannel.send({ type: 'broadcast', event: 'bye', payload: { type: 'bye' } }); } catch (_) {}
+          }
+        }
+      }, 3000);
+    } else {
+      // Page became visible again — cancel pending bye and re-track presence.
+      if (_byeDelayId !== null) { clearTimeout(_byeDelayId); _byeDelayId = null; }
+      if (broadcastChannel) { try { broadcastChannel.track({ user: 'phone' }); } catch (_) {} }
+      // Reassert torch if the OS dropped it while the page was hidden/locked.
+      setTimeout(function () { _reassertTorchAfterResume('visibility'); }, 150);
+    }
+  }, { capture: true });
+
+})();
+</script>
+</body>
+</html>
