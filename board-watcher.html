@@ -55,6 +55,14 @@ button:not(:disabled):hover{background:#2e3c4e}
 .controls input[type=range]{width:130px}
 .controls span.val{font-size:13px;color:var(--txt);min-width:44px}
 .hint{font-size:13px;color:var(--dim);margin:10px 2px 0}
+.debug{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 12px 10px}
+.debug summary{cursor:pointer;color:var(--dim);font-size:14px}
+.dbgrow{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+.dbgrow figure{margin:0;text-align:center}
+.dbgrow canvas{image-rendering:pixelated;border:1px solid var(--line);border-radius:4px;
+  background:#000;width:144px;height:144px}
+.dbgrow figcaption{font-size:12px;color:var(--dim);margin-top:4px;max-width:150px}
+#dbgStats{text-align:left;margin:8px 0 0;min-width:0}
 h2{font-size:17px;margin:22px 0 8px}
 #gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 #gallery figure{margin:0;background:var(--panel);border:1px solid var(--line);
@@ -67,7 +75,7 @@ footer{max-width:1000px;margin:0 auto;padding:0 16px 30px;color:var(--dim);font-
 <body>
 <header>
   <h1>Table Stream <span class="sub">&mdash; board watcher (no backend)</span></h1>
-  <p>Live board detection + automatic settled-state photos. Single file, runs from any static host.</p>
+  <p>Live board detection + automatic settled-state photos. Static files, runs from any static host.</p>
 </header>
 <main>
   <section class="stage" aria-label="Live camera">
@@ -82,7 +90,7 @@ footer{max-width:1000px;margin:0 auto;padding:0 16px 30px;color:var(--dim);font-
       <span class="meter" title="Motion level"><span id="motionFill"></span></span>
       <span id="motionVal" class="mono">0.0%</span>
       <canvas id="warpView" width="160" height="160"
-        title="Top-down board view used for motion detection"></canvas>
+        title="1-bit top-down board view used for motion detection"></canvas>
     </div>
     <div class="controls">
       <button id="startBtn">Start camera</button>
@@ -100,10 +108,31 @@ footer{max-width:1000px;margin:0 auto;padding:0 16px 30px;color:var(--dim);font-
       <b style="color:#ff6b6b">red quadrilateral</b> means ARMED.
       Hold still and a photo is captured once the pieces settle; each new move
       followed by stillness captures another. Small camera bumps re-seat the red
-      box automatically. The small square shows the top-down
+      box automatically. The small square shows the 1-bit top-down
       board view used for motion detection.
       Note: browsers only allow the camera on <b>https</b> (GitHub Pages works)
       or <b>localhost</b>, not file://.</p>
+    <details class="debug" id="dbgDetails">
+      <summary>Debug: settled-logic vision</summary>
+      <div class="dbgrow">
+        <figure>
+          <canvas id="dbgAdaptive" width="160" height="160"></canvas>
+          <figcaption>1-bit board (adaptive threshold)</figcaption>
+        </figure>
+        <figure>
+          <canvas id="dbgBlocks" width="48" height="48"></canvas>
+          <figcaption>1-bit block grid (settled input)</figcaption>
+        </figure>
+        <figure>
+          <canvas id="dbgDiff" width="48" height="48"></canvas>
+          <figcaption>changed blocks this frame</figcaption>
+        </figure>
+      </div>
+      <p class="mono" id="dbgStats">&mdash;</p>
+      <p class="hint">Screenshot this panel to share what the settler sees.
+        Dark pieces on a light board should read as dark blobs on white;
+        the changed-blocks view should go nearly black when truly still.</p>
+    </details>
   </section>
   <section aria-label="Captured stills">
     <h2>Captured stills <span id="photoCount"></span></h2>
@@ -120,543 +149,7 @@ function __cvFallback(){
   document.head.appendChild(s);
 }
 </script>
-<script async src="https://docs.opencv.org/4.10.0/opencv.js" onerror="__cvFallback()"></script>
-<script>
-(() => {
-'use strict';
-
-/* ---------- DOM ---------- */
-const $ = (id) => document.getElementById(id);
-const video = $('video');
-const overlay = $('overlay');
-const octx = overlay.getContext('2d');
-const wrap = $('videowrap');
-const flashEl = $('flash');
-const warpView = $('warpView');
-const statusEl = $('status');
-const armedBadge = $('armedBadge');
-const motionFill = $('motionFill');
-const motionVal = $('motionVal');
-const startBtn = $('startBtn');
-const snapBtn = $('snapBtn');
-const sensSlider = $('sensitivity');
-const sensVal = $('sensVal');
-const settleSlider = $('settleFrames');
-const settleVal = $('settleVal');
-const gallery = $('gallery');
-const photoCount = $('photoCount');
-
-const proc = document.createElement('canvas');
-const pctx = proc.getContext('2d', { willReadFrequently: true });
-
-/* ---------- Config / state ---------- */
-const PROC_W = 640;          // detection resolution (width px)
-const WARP_S = 160;          // canonical board view (square px)
-const DETECT_EVERY_MS = 150; // board-hunt cadence
-const ARM_HITS = 2;          // consecutive detections to arm
-const DISARM_MISSES = 8;     // consecutive misses to disarm (~1.2 s grace)
-const SMOOTH = 0.6;          // corner follow rate (bumps re-seat fast)
-const HI_MULT = 2.5;         // motion hysteresis: mild jitter counts as still
-const CAPTURE_COOLDOWN_MS = 3000;
-const MAX_PHOTOS = 30;
-
-let procW = PROC_W, procH = 480;
-let sizesOk = false;
-let matsOk = false;
-let streaming = false;
-let cvReadyFlag = false;
-let lastDetect = 0;
-let track = { quad: null, hits: 0, misses: 0 };
-let armed = false;
-let warpValid = false;
-let lastWarpQuad = null;
-let settledStreak = 0;
-let motionSeen = false;
-let motionNow = false;
-let lastRatio = 0;
-let lastCapture = 0;
-let captureFlashUntil = 0;
-let photoTotal = 0;
-let lastStatusKey = '';
-
-let gray = null, blurred = null, edges = null, warped = null,
-    prevWarp = null, diff = null, thresh = null, kernel = null;
-
-const motionThreshold = () => parseFloat(sensSlider.value) / 100;
-const settleNeed = () => parseInt(settleSlider.value, 10);
-
-/* ---------- Status UI ---------- */
-function setStatus(text, mode) {
-  const key = mode + '|' + text;
-  if (key === lastStatusKey) return;
-  lastStatusKey = key;
-  statusEl.textContent = text;
-  statusEl.className = 'pill ' + mode;
-}
-
-function refreshArmedBadge() {
-  if (armed) {
-    armedBadge.textContent = '\u25CF ARMED';
-    armedBadge.className = 'armed on';
-  } else if (track.quad) {
-    armedBadge.textContent = '\u25CF ACQUIRING';
-    armedBadge.className = 'armed acquiring';
-  } else {
-    armedBadge.textContent = '\u25CF NO BOARD';
-    armedBadge.className = 'armed off';
-  }
-}
-
-function updateStatus() {
-  if (performance.now() < captureFlashUntil) return; // keep "captured" up briefly
-  if (!cvReadyFlag) { setStatus('Loading OpenCV.js\u2026', 'loading'); return; }
-  if (!streaming) { setStatus('Press \u201CStart camera\u201D, then point it at the board.', 'idle'); return; }
-  if (!armed) { setStatus('Searching for board \u2014 keep the whole board in frame.', 'searching'); return; }
-  if (motionNow) { setStatus('Motion \u2014 pieces moving\u2026', 'motion'); return; }
-  if (settledStreak > 0) {
-    setStatus('Settling\u2026 still for ' + settledStreak + '/' + settleNeed() + ' frames', 'settling');
-    return;
-  }
-  setStatus('Board locked \u2014 waiting for stillness.', 'locked');
-}
-
-/* ---------- OpenCV readiness ---------- */
-let cvTries = 0;
-const cvTimer = setInterval(() => {
-  const cv = window.cv;
-  if (cv && cv.Mat && cv.imread) {
-    clearInterval(cvTimer);
-    cvReadyFlag = true;
-  } else if (++cvTries > 600) { // ~60 s
-    clearInterval(cvTimer);
-    setStatus('Could not load OpenCV.js \u2014 check your connection and reload.', 'error');
-  }
-}, 100);
-
-/* ---------- Camera ---------- */
-async function startCamera() {
-  startBtn.disabled = true;
-  setStatus('Starting camera\u2026', 'loading');
-  const tries = [
-    { video: { facingMode: { ideal: 'environment' },
-               width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-    { video: true, audio: false },
-  ];
-  let err = null;
-  for (const c of tries) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(c);
-      video.srcObject = stream;
-      await video.play();
-      streaming = true;
-      snapBtn.disabled = false;
-      startBtn.textContent = 'Camera running';
-      return;
-    } catch (e) { err = e; }
-  }
-  startBtn.disabled = false;
-  const denied = err && err.name === 'NotAllowedError';
-  const msg = denied
-    ? 'Camera permission denied \u2014 allow camera access and try again.'
-    : 'No camera available (' + ((err && err.message) || 'unknown error') + ').';
-  setStatus(msg + ' Note: browsers require https (GitHub Pages) or localhost.', 'error');
-}
-startBtn.addEventListener('click', startCamera);
-snapBtn.addEventListener('click', () => capturePhoto('manual'));
-sensSlider.addEventListener('input', () => {
-  sensVal.textContent = parseFloat(sensSlider.value).toFixed(1) + '%';
-});
-settleSlider.addEventListener('input', () => {
-  settleVal.textContent = settleSlider.value;
-});
-
-/* ---------- Frame plumbing ---------- */
-function resetTrack() {
-  track = { quad: null, hits: 0, misses: 0 };
-  armed = false;
-  warpValid = false;
-  lastWarpQuad = null;
-  settledStreak = 0;
-  motionNow = false;
-  lastRatio = 0;
-  motionSeen = true; // re-settling after a re-acquire deserves a photo
-  refreshArmedBadge();
-}
-
-// Keep the overlay canvas registered on the displayed video rect, even if the
-// wrapper aspect ever disagrees with the video aspect (rotation transitions).
-function layoutOverlay() {
-  const vw = video.videoWidth, vh = video.videoHeight;
-  if (!vw || !vh) return;
-  const r = wrap.getBoundingClientRect();
-  if (!r || !r.width || !r.height) return;
-  const va = vw / vh, boxA = r.width / r.height;
-  let dw, dh;
-  if (va >= boxA) { dw = r.width; dh = dw / va; }
-  else { dh = r.height; dw = dh * va; }
-  overlay.style.width = dw + 'px';
-  overlay.style.height = dh + 'px';
-  overlay.style.left = ((r.width - dw) / 2) + 'px';
-  overlay.style.top = ((r.height - dh) / 2) + 'px';
-}
-window.addEventListener('resize', layoutOverlay);
-window.addEventListener('orientationchange', layoutOverlay);
-
-function ensureSizes() {
-  const vw = video.videoWidth, vh = video.videoHeight;
-  if (!vw || !vh) return;
-  if (overlay.width !== vw || overlay.height !== vh) {
-    overlay.width = vw;
-    overlay.height = vh;
-    wrap.style.aspectRatio = vw + ' / ' + vh;
-    layoutOverlay();
-  }
-  const pw = PROC_W, ph = Math.round((PROC_W * vh) / vw);
-  if (proc.width !== pw || proc.height !== ph) {
-    proc.width = pw;
-    proc.height = ph;
-    procW = pw;
-    procH = ph;
-    sizesOk = false;
-    resetTrack(); // stale corners are meaningless at a new aspect (rotation)
-  }
-  sizesOk = true;
-}
-
-function ensureMats() {
-  if (matsOk) return;
-  const cv = window.cv;
-  gray = new cv.Mat();
-  blurred = new cv.Mat();
-  edges = new cv.Mat();
-  warped = new cv.Mat();
-  prevWarp = new cv.Mat();
-  diff = new cv.Mat();
-  thresh = new cv.Mat();
-  kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-  warpValid = false;
-  matsOk = true;
-}
-
-/* ---------- Board detection ---------- */
-function matToPts(approx) {
-  const d = approx.data32S;
-  return [
-    { x: d[0], y: d[1] }, { x: d[2], y: d[3] },
-    { x: d[4], y: d[5] }, { x: d[6], y: d[7] },
-  ];
-}
-
-function orderCyclic(pts) {
-  const cx = (pts[0].x + pts[1].x + pts[2].x + pts[3].x) / 4;
-  const cy = (pts[0].y + pts[1].y + pts[2].y + pts[3].y) / 4;
-  return pts.slice().sort((a, b) =>
-    Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-}
-
-// Keep corner identity stable frame-to-frame so the warped view doesn't spin.
-function rotateToMatch(ordered, prev) {
-  if (!prev) return ordered;
-  let bi = 0, bd = Infinity;
-  for (let i = 0; i < 4; i++) {
-    const dx = ordered[i].x - prev[0].x, dy = ordered[i].y - prev[0].y;
-    const d = dx * dx + dy * dy;
-    if (d < bd) { bd = d; bi = i; }
-  }
-  return ordered.slice(bi).concat(ordered.slice(0, bi));
-}
-
-function insideMargin(pts, mx, my) {
-  for (const p of pts) {
-    if (p.x < mx || p.x > procW - mx || p.y < my || p.y > procH - my) return false;
-  }
-  return true;
-}
-
-function minEdgeLen(pts) {
-  let m = Infinity;
-  for (let i = 0; i < 4; i++) {
-    const a = pts[i], b = pts[(i + 1) % 4];
-    m = Math.min(m, Math.hypot(a.x - b.x, a.y - b.y));
-  }
-  return m;
-}
-
-function meanEdge(pts) {
-  let s = 0;
-  for (let i = 0; i < 4; i++) {
-    const a = pts[i], b = pts[(i + 1) % 4];
-    s += Math.hypot(a.x - b.x, a.y - b.y);
-  }
-  return s / 4;
-}
-
-function meanDist(a, b) {
-  let s = 0;
-  for (let i = 0; i < 4; i++) s += Math.hypot(a[i].x - b[i].x, a[i].y - b[i].y);
-  return s / 4;
-}
-
-// Largest convex quadrilateral that is fully inside the frame. Strict margins
-// to acquire, forgiving margins to keep tracking through small bumps.
-function detectQuad(g) {
-  const cv = window.cv;
-  cv.GaussianBlur(g, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
-  cv.Canny(blurred, edges, 50, 150, 3, false);
-  cv.dilate(edges, edges, kernel);
-  const contours = new cv.MatVector();
-  const hier = new cv.Mat();
-  cv.findContours(edges, contours, hier, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
-  const imgArea = procW * procH;
-  const strict = !track.quad;
-  const mx = procW * (strict ? 0.02 : -0.015);
-  const my = procH * (strict ? 0.02 : -0.015);
-  const minDim = Math.min(procW, procH);
-  let best = null, bestArea = 0;
-  for (let i = 0; i < contours.size(); i++) {
-    const c = contours.get(i);
-    const area = cv.contourArea(c);
-    if (area < imgArea * 0.02 || area > imgArea * 0.98) continue;
-    const peri = cv.arcLength(c, true);
-    const approx = new cv.Mat();
-    cv.approxPolyDP(c, approx, 0.02 * peri, true);
-    if (approx.rows === 4 && cv.isContourConvex(approx)) {
-      const a = cv.contourArea(approx);
-      if (a > bestArea && a > imgArea * 0.04 && a < imgArea * 0.96 &&
-          a / area > 0.8) {
-        const pts = matToPts(approx);
-        if (insideMargin(pts, mx, my) && minEdgeLen(pts) > minDim * 0.10) {
-          bestArea = a;
-          best = pts;
-        }
-      }
-    }
-    approx.delete();
-  }
-  contours.delete();
-  hier.delete();
-  return best ? rotateToMatch(orderCyclic(best), track.quad) : null;
-}
-
-function updateTrack(found) {
-  const wasArmed = armed;
-  if (found && track.quad) {
-    // Ignore wild jumps (a different rectangle) — coast on the old quad.
-    const gate = 0.45 * meanEdge(track.quad);
-    if (meanDist(found, track.quad) > gate) found = null;
-  }
-  if (found) {
-    if (track.quad) {
-      track.quad = track.quad.map((q, i) => ({
-        x: q.x + (found[i].x - q.x) * SMOOTH,
-        y: q.y + (found[i].y - q.y) * SMOOTH,
-      }));
-    } else {
-      track.quad = found;
-    }
-    track.hits++;
-    track.misses = 0;
-  } else {
-    track.misses++;
-    if (track.misses > DISARM_MISSES) {
-      track.quad = null;
-      track.hits = 0;
-    }
-  }
-  armed = !!track.quad && track.hits >= ARM_HITS;
-  if (armed && !wasArmed) {
-    // Freshly armed: re-seed the stillness detector and want one photo.
-    warpValid = false;
-    lastWarpQuad = null;
-    settledStreak = 0;
-    motionSeen = true;
-  }
-  if (!armed) {
-    motionNow = false;
-    settledStreak = 0;
-    lastRatio = 0;
-  }
-  refreshArmedBadge();
-}
-
-/* ---------- Motion / settle detection ---------- */
-// Warp the tracked quad to a canonical top-down square, then diff vs last frame.
-function motionUpdate(g) {
-  const cv = window.cv;
-  const S = WARP_S;
-  const flat = [];
-  for (const p of track.quad) flat.push(p.x, p.y);
-  const src = cv.matFromArray(4, 1, cv.CV_32FC2, flat);
-  const dst = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, S, 0, S, S, 0, S]);
-  const M = cv.getPerspectiveTransform(src, dst);
-  cv.warpPerspective(g, warped, new cv.Size(S, S),
-    cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
-  cv.GaussianBlur(warped, warped, new cv.Size(7, 7), 0, 0, cv.BORDER_DEFAULT);
-  src.delete();
-  dst.delete();
-  M.delete();
-  let ratio = 0;
-  if (warpValid) {
-    cv.absdiff(warped, prevWarp, diff);
-    cv.threshold(diff, thresh, 30, 255, cv.THRESH_BINARY);
-    ratio = cv.countNonZero(thresh) / (S * S);
-  }
-  warped.copyTo(prevWarp);
-  warpValid = true;
-
-  let jump = false;
-  if (lastWarpQuad) jump = meanDist(track.quad, lastWarpQuad) > 10;
-  lastWarpQuad = track.quad.map((p) => ({ x: p.x, y: p.y }));
-
-  try { cv.imshow(warpView, warped); } catch (e) { /* preview only */ }
-  return { ratio, jump };
-}
-
-function updateSettle(ratio, jump) {
-  lastRatio = ratio;
-  // Hysteresis: only strong motion breaks the settle streak and arms the next
-  // capture; mild handheld jitter counts as still so auto-capture can fire.
-  const hi = motionThreshold() * HI_MULT;
-  motionNow = jump || ratio >= hi;
-  if (!armed) return;
-  if (motionNow) {
-    settledStreak = 0;
-    motionSeen = true;
-    return;
-  }
-  settledStreak++;
-  if (settledStreak >= settleNeed() && motionSeen &&
-      performance.now() - lastCapture >= CAPTURE_COOLDOWN_MS) {
-    motionSeen = false;
-    settledStreak = 0;
-    capturePhoto('settled');
-  }
-}
-
-/* ---------- Overlay / readouts ---------- */
-function drawOverlay() {
-  const W = overlay.width, H = overlay.height;
-  octx.clearRect(0, 0, W, H);
-  if (!track.quad) return;
-  const sx = W / procW, sy = H / procH;
-  octx.beginPath();
-  track.quad.forEach((p, i) => {
-    const X = p.x * sx, Y = p.y * sy;
-    if (i === 0) octx.moveTo(X, Y); else octx.lineTo(X, Y);
-  });
-  octx.closePath();
-  if (armed) {
-    octx.strokeStyle = '#ff2222';
-    octx.lineWidth = Math.max(2, W / 300);
-    octx.setLineDash([]);
-  } else {
-    octx.strokeStyle = '#ffb020';
-    octx.lineWidth = Math.max(2, W / 400);
-    octx.setLineDash([14, 10]);
-  }
-  octx.stroke();
-  octx.setLineDash([]);
-  octx.fillStyle = armed ? '#ff2222' : '#ffb020';
-  for (const p of track.quad) {
-    octx.beginPath();
-    octx.arc(p.x * sx, p.y * sy, Math.max(3, W / 220), 0, Math.PI * 2);
-    octx.fill();
-  }
-}
-
-function updateReadouts() {
-  const pct = lastRatio * 100;
-  motionVal.textContent = pct.toFixed(1) + '%';
-  const hi = motionThreshold() * HI_MULT * 100;
-  motionFill.style.width = Math.min(100, (pct / hi) * 100).toFixed(1) + '%';
-  motionFill.className = motionNow ? 'over' : '';
-}
-
-/* ---------- Capture ---------- */
-function capturePhoto(reason) {
-  if (!streaming || !video.videoWidth) return;
-  const now = performance.now();
-  if (now - lastCapture < CAPTURE_COOLDOWN_MS && reason !== 'manual') return;
-  lastCapture = now;
-  const c = document.createElement('canvas');
-  c.width = video.videoWidth;
-  c.height = video.videoHeight;
-  const x = c.getContext('2d');
-  x.drawImage(video, 0, 0);
-  if (track.quad) {
-    const sx = c.width / procW, sy = c.height / procH;
-    x.beginPath();
-    track.quad.forEach((p, i) => {
-      const X = p.x * sx, Y = p.y * sy;
-      if (i === 0) x.moveTo(X, Y); else x.lineTo(X, Y);
-    });
-    x.closePath();
-    x.strokeStyle = '#ff2222';
-    x.lineWidth = Math.max(3, c.width / 300);
-    x.stroke();
-  }
-  const stamp = new Date().toLocaleTimeString();
-  x.fillStyle = 'rgba(0,0,0,0.55)';
-  x.fillRect(0, c.height - 30, 240, 30);
-  x.fillStyle = '#fff';
-  x.font = '16px system-ui, sans-serif';
-  x.fillText(stamp + ' \u2014 ' + reason, 10, c.height - 9);
-  const url = c.toDataURL('image/jpeg', 0.85);
-  const fig = document.createElement('figure');
-  const img = new Image();
-  img.src = url;
-  img.alt = 'Settled board at ' + stamp;
-  img.loading = 'lazy';
-  const cap = document.createElement('figcaption');
-  cap.textContent = stamp + ' \u2014 ' + reason;
-  fig.appendChild(img);
-  fig.appendChild(cap);
-  gallery.prepend(fig);
-  while (gallery.children.length > MAX_PHOTOS) gallery.removeChild(gallery.lastChild);
-  photoTotal++;
-  photoCount.textContent = '(' + photoTotal + ')';
-  flashEl.classList.remove('go');
-  void flashEl.offsetWidth;
-  flashEl.classList.add('go');
-  captureFlashUntil = performance.now() + 1500;
-  setStatus('Settled \u2014 photo captured \u2713', 'captured');
-}
-
-/* ---------- Main loop ---------- */
-function tick() {
-  requestAnimationFrame(tick);
-  updateStatus();
-  if (!streaming || !cvReadyFlag) return;
-  if (!video.videoWidth || video.readyState < 2) return;
-  ensureSizes();
-  if (!sizesOk) return;
-  ensureMats();
-  const cv = window.cv;
-  pctx.drawImage(video, 0, 0, procW, procH);
-  const src = cv.imread(proc);
-  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-  src.delete();
-  const now = performance.now();
-  if (now - lastDetect >= DETECT_EVERY_MS) {
-    lastDetect = now;
-    updateTrack(detectQuad(gray));
-  }
-  if (armed && track.quad) {
-    const m = motionUpdate(gray);
-    updateSettle(m.ratio, m.jump);
-  }
-  drawOverlay();
-  updateReadouts();
-}
-
-/* ---------- Go ---------- */
-sensVal.textContent = parseFloat(sensSlider.value).toFixed(1) + '%';
-settleVal.textContent = settleSlider.value;
-refreshArmedBadge();
-updateStatus();
-requestAnimationFrame(tick);
-
-})();
-</script>
+<script async src="https://docs.opencv.org/4.x/opencv.js" onerror="__cvFallback()"></script>
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>
